@@ -178,8 +178,9 @@ class Heirloom(object):
             raise AssertionError(f'Unable to find game with name "{game_name}')
         fn = self.download_game(game_name)
         folder_name = '_'.join(fn.split('_')[:-1])
-        result = subprocess.run([self._wine_path, self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}'], shell=True, capture_output=True)
-        return {'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+        cmd = [self._wine_path, self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+        result = subprocess.run(cmd, shell=True, capture_output=True)
+        return {'cmd': cmd, 'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
 
     def uninstall_game(self):
