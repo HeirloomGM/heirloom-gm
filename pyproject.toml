@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heirloom"
+version = "0.1"
+dependencies = [
+    "requests",
+    "typer",
+    "rich",
+    "InquirerPy",
+    "keyring",
+    "cryptography"
+]
+requires-python = ">= 3.10"
+
+[project.scripts]
+heirloom-gm = "heirloom.cli:main"
