@@ -31,8 +31,10 @@ pip install git+https://github.com/heirloom-gm/heirloom-gm
 ```
 
 
-### Usage
+### CLI Usage
 ---
+`pip` will install a command line tool called `heirloom-gm`.
+
 Basic commands are as follows:
 
 Option | Description
@@ -71,6 +73,32 @@ heirloom-gm info
 ```
 ```
 ? Select a game:  The Wild Case
+{
+   'game_id': 'cc182bea-cd61-4be4-b167-3db2659c5364',
+   'game_name': 'The Wild Case',
+   'game_description': 'Can you survive as you investigate strange creatures with glowing eyes?',
+   'game_coverart': 'https://legacygames.com/wp-content/uploads/Legacy-Games_The-Wild-Case.jpg',
+   'game_installed_size': '218.1 MB',
+   'installer_uuid': 'fad5198e-5c92-4493-b498-d77dc0ba6111',
+   'amazonprime_giveaway': True
+}
+```
+
+
+### Library usage
+---
+I was trying to make something that could be easily imported and used in other programs, so in addition to the CLI, you can also import the module and call its functions programmatically.
+
+```python
+from rich.pretty import pprint
+from heirloom import Heirloom
+
+h = Heirloom(user='YOUR_EMAIL', password='YOUR_PASSWORD', base_install_dir='~/Games/LegacyGames/')
+user_id = h.login()
+h.refresh_games_list()
+pprint(h.dump_game_data("The Wild Case"))
+```
+```
 {
    'game_id': 'cc182bea-cd61-4be4-b167-3db2659c5364',
    'game_name': 'The Wild Case',
