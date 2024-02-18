@@ -31,6 +31,11 @@ pip install git+https://github.com/heirloom-gm/heirloom-gm
 ```
 
 
+### Configuration
+---
+The config file for the CLI is stored in JSON format and is stored by default in `~/.config/heirloom/config.json`. The password stored in the file is encrypted with a random encryption key that is generated when the CLI is first run.
+
+
 ### CLI Usage
 ---
 `pip` will install a command line tool called `heirloom-gm`.
