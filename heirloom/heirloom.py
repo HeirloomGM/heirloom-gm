@@ -28,7 +28,7 @@ class Heirloom(object):
         self._base_install_dir = os.path.expanduser(base_install_dir)
         self._base_install_wine_path = self.convert_to_wine_path(self._base_install_dir)
         self._wine_path = kwargs.get('wine_path') or shutil.which('wine')
-        self._7zip_path = kwargs.get('7zip_path') or shutil.which('7zip')
+        self._7zip_path = kwargs.get('7zip_path') or shutil.which('7z')
         self._quiet = kwargs.get('quiet') or False
         self._tmp_dir = kwargs.get('temp_dir') or os.path.expanduser('~/.heirloom.tmp/')
         self.games = []
