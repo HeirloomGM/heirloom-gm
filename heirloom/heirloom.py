@@ -17,17 +17,18 @@ class Heirloom(object):
         }
         self._api_url = 'https://api.legacygames.com'
         self._login_url = self._api_url + '/users/login'
-        self._giveawayurl = self._api_url + '/users/getgiveawaycatalogbyemail'
-        self._giveawaydownloadurl = self._api_url + '/products/giveawaydownload'
+        self._giveaway_catalog_url = self._api_url + '/users/getgiveawaycatalogbyemail'
+        self._giveaway_download_url = self._api_url + '/products/giveawaydownload'
         self._product_catalog_url = self._api_url + '/products/catalog'
         self._purchased_games_url = self._api_url + '/users/downloads'
-        self._purchasedownloadurl = self._api_url + '/products/download'
+        self._purchase_download_url = self._api_url + '/products/download'
         self._profile_url = self._api_url + '/users/profile'
         self._user_id = None
         self._base_install_dir = os.path.expanduser(base_install_dir)
         self._base_install_wine_path = self.convert_to_wine_path(self._base_install_dir)
         self._wine_path = kwargs.get('wine_path') or '/usr/bin/wine'
-        self._tmp_dir = os.path.expanduser('~/.heirloom.tmp/')
+        self._quiet = kwargs.get('quiet') or False
+        self._tmp_dir = kwargs.get('temp_dir') or os.path.expanduser('~/.heirloom.tmp/')
         self.games = []
 
 
@@ -35,7 +36,7 @@ class Heirloom(object):
     def convert_to_wine_path(path_to_convert):
         expanded_path = os.path.expanduser(path_to_convert)
         if expanded_path.startswith('C:'):
-            expanded_path = expanded_path.replace('C:', 'Z:')
+            expanded_path = expanded_path.replace('C:', 'Z:', 1)
         if not expanded_path.startswith('Z:'):
             converted_path = 'Z:' + expanded_path.replace('/', '\\')
         else:
@@ -70,7 +71,7 @@ class Heirloom(object):
         params = {
             'email': self.get_user_email()
         }
-        response = requests.get(self._giveawayurl, headers=self._headers, params=params)
+        response = requests.get(self._giveaway_catalog_url, headers=self._headers, params=params)
         response_json = response.json()
         games = []
         for data in response_json['data']:
@@ -87,8 +88,7 @@ class Heirloom(object):
         purchased_games = self.get_purchased_games()
         for each in purchased_games:
             each['amazonprime_giveaway'] = False
-        games = purchased_games + [g for g in giveaway_games if g['game_name'] not in [p['game_name'] for p in purchased_games]]
-        self.games = games
+        self.games = purchased_games + [g for g in giveaway_games if g['game_name'] not in [p['game_name'] for p in purchased_games]]
 
 
     def download_game(self, game_name, output_dir=None):
@@ -102,7 +102,7 @@ class Heirloom(object):
             params = {
                 'installerUuid': game['installer_uuid']
             }
-            response = requests.get(self._giveawaydownloadurl, headers=self._headers, params=params)
+            response = requests.get(self._giveaway_download_url, headers=self._headers, params=params)
         else:
             product_catalog = self.get_product_catalog()
             params = {
@@ -122,7 +122,7 @@ class Heirloom(object):
                 'productId': product['product_id'],
                 'gameId': game['game_id']
             }
-            response = requests.get(self._purchasedownloadurl, headers=self._headers, params=params)            
+            response = requests.get(self._purchase_download_url, headers=self._headers, params=params)
         response_json = response.json()
         if not response_json.get('data') or type(response_json.get('data')) != dict:
             raise AssertionError(f'Got invalid data back from download request!\n{response_json.get("data")}\nParams:\n{params}')
@@ -133,10 +133,14 @@ class Heirloom(object):
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
         with open(output_dir + cdn_url.split('/')[-1], 'wb') as f:
-            with Progress() as progress_bar:
-                download_task = progress_bar.add_task(f'[green]Downloading[/green] [white italic]{game_name}[/white italic] ([yellow]{game["game_installed_size"]}[/yellow])', total=total_size)
+            if not self._quiet:
+                with Progress() as progress_bar:
+                    download_task = progress_bar.add_task(f'[green]Downloading[/green] [white italic]{game_name}[/white italic] ([yellow]{game["game_installed_size"]}[/yellow])', total=total_size)
+                    for data in response.iter_content(block_size):
+                        progress_bar.update(download_task, advance=len(data))
+                        f.write(data)
+            else:
                 for data in response.iter_content(block_size):
-                    progress_bar.update(download_task, advance=len(data))
                     f.write(data)
         return cdn_url.split('/')[-1]
 
@@ -178,7 +182,7 @@ class Heirloom(object):
             raise AssertionError(f'Unable to find game with name "{game_name}')
         fn = self.download_game(game_name)
         folder_name = '_'.join(fn.split('_')[:-1])
-        cmd = [self._wine_path, self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+        cmd = [self._wine_path, 'start', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
         result = subprocess.run(cmd, shell=True, capture_output=True)
         return {'cmd': cmd, 'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
