@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import shutil
+from enum import Enum
 
 import keyring
 import rich
@@ -14,6 +15,11 @@ from typing_extensions import Annotated
 
 from ..heirloom import Heirloom
 
+
+class InstallationMethod(str, Enum):
+    wine = 'wine'
+    sevenzip = '7zip'
+    
 
 def get_config():
     if not os.path.isdir(config_dir):
@@ -161,7 +167,8 @@ def download(game: Annotated[str, typer.Option(help='Game name to download, will
 
 @app.command('install')
 def install(game: Annotated[str, typer.Option(help='Game name to download, will be prompted if not provided')] = None,
-            uuid: Annotated[str, typer.Option(help='UUID of game to download, will be prompted for game name if not provided')] = None):
+            uuid: Annotated[str, typer.Option(help='UUID of game to download, will be prompted for game name if not provided')] = None,
+            install_method: Annotated[InstallationMethod, typer.Option(case_sensitive=False)] = InstallationMethod.wine):
     """
     Installs a game from the Legacy Games library.    
     """
@@ -173,7 +180,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
         game = select_from_games_list()
-    result = heirloom.install_game(game)
+    result = heirloom.install_game(game, installation_method=install_method.value)
     console.print(result)
     console.print(f'Installation to [green]{result["install_path"]}[/green] successful!')
 
