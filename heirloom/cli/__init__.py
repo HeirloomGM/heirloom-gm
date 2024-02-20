@@ -44,6 +44,12 @@ def get_config():
                 'name': 'wine_path',
                 'message': 'Path to Wine executable: ',
                 'default': shutil.which('wine') or '/usr/bin/wine'
+            },
+            {
+                'type': 'input',
+                'name': '7zip_path',
+                'message': 'Path to 7zip executable: ',
+                'default': shutil.which('7z') or '/usr/bin/7z'
             }
         ]
         answers = prompt(questions)
