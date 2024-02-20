@@ -178,6 +178,7 @@ class Heirloom(object):
 
 
     def install_game(self, game_name, installation_method='wine'):
+        cmd = None
         if installation_method.lower() not in ('wine', '7zip'):
             raise AssertionError(f'Invalid installation method ("{installation_method}"); valid installation methods are: ["wine", "7zip"]')
         if installation_method.lower() == 'wine':
