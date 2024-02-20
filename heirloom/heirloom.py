@@ -1,6 +1,7 @@
 import requests
 import base64
 import os
+import shutil
 import subprocess
 from rich.progress import Progress
 
@@ -26,7 +27,8 @@ class Heirloom(object):
         self._user_id = None
         self._base_install_dir = os.path.expanduser(base_install_dir)
         self._base_install_wine_path = self.convert_to_wine_path(self._base_install_dir)
-        self._wine_path = kwargs.get('wine_path') or '/usr/bin/wine'
+        self._wine_path = kwargs.get('wine_path') or shutil.which('wine')
+        self._7zip_path = kwargs.get('7zip_path') or shutil.which('7zip')
         self._quiet = kwargs.get('quiet') or False
         self._tmp_dir = kwargs.get('temp_dir') or os.path.expanduser('~/.heirloom.tmp/')
         self.games = []
@@ -175,14 +177,23 @@ class Heirloom(object):
         return game
 
 
-    def install_game(self, game_name):
+    def install_game(self, game_name, installation_method='wine'):
+        if installation_method.lower() not in ('wine', '7zip'):
+            raise AssertionError(f'Invalid installation method ("{installation_method}"); valid installation methods are: ["wine", "7zip"]')
+        if installation_method.lower() == 'wine':
+            if not self._wine_path or not os.path.exists(self._wine_path):
+                raise AssertionError(f'wine executable not found!')
+            cmd = [self._wine_path, 'start', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+        elif installation_method.lower() == '7zip':
+            if not self._7zip_path or not os.path.exists(self._7zip_path):
+                raise AssertionError(f'7z executable not found!')
+            cmd = [self._7zip_path, 'x', '-o', f'{self._base_install_dir}{folder_name}']
         try:
             game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
         except StopIteration:
             raise AssertionError(f'Unable to find game with name "{game_name}')
         fn = self.download_game(game_name)
         folder_name = '_'.join(fn.split('_')[:-1])
-        cmd = [self._wine_path, 'start', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
         result = subprocess.run(cmd, shell=True, capture_output=True)
         return {'cmd': cmd, 'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
