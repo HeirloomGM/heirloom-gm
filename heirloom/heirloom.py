@@ -194,7 +194,7 @@ class Heirloom(object):
         elif installation_method.lower() == '7zip':
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')
-            cmd = [self._7zip_path, 'x', '-o', f'{self._base_install_dir}{folder_name}']
+            cmd = [self._7zip_path, 'x', '-o', f'{self._base_install_dir}{folder_name}', self._tmp_dir + fn]
         result = subprocess.run(cmd, shell=True, capture_output=True)
         return {'cmd': cmd, 'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
