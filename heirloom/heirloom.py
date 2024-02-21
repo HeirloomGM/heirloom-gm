@@ -40,9 +40,9 @@ class Heirloom(object):
         if expanded_path.startswith('C:'):
             expanded_path = expanded_path.replace('C:', 'Z:', 1)
         if not expanded_path.startswith('Z:'):
-            converted_path = 'Z:' + expanded_path.replace('/', '\\')
+            converted_path = 'Z:' + expanded_path.replace('\\', '/')
         else:
-            converted_path = expanded_path.replace('/', '\\')
+            converted_path = expanded_path.replace('\\', '/')
         return converted_path
 
 
@@ -190,13 +190,13 @@ class Heirloom(object):
         if installation_method.lower() == 'wine':
             if not self._wine_path or not os.path.exists(self._wine_path):
                 raise AssertionError(f'wine executable not found!')
-            cmd = [self._wine_path, 'start', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+            cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
         elif installation_method.lower() == '7zip':
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')
-            cmd = [self._7zip_path, 'x', '-o', f'{self._base_install_dir}{folder_name}', self._tmp_dir + fn]
-        result = subprocess.run(cmd, shell=True, capture_output=True)
-        return {'cmd': cmd, 'stdout': result.stdout, 'stderr': result.stderr, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+            cmd = [self._7zip_path, 'x', f'-o{self._base_install_dir}{folder_name}', '-y', self._tmp_dir + fn]
+        result = subprocess.run(' '.join(cmd), timeout=300, shell=True, check=True, capture_output=True)
+        return {'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
 
     def uninstall_game(self):
