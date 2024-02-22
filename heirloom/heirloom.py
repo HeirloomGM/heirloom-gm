@@ -3,7 +3,9 @@ import base64
 import os
 import shutil
 import subprocess
+from pathlib import Path
 from rich.progress import Progress
+from rich import print as rprint
 
 
 class Heirloom(object):
@@ -37,12 +39,11 @@ class Heirloom(object):
     @staticmethod
     def convert_to_wine_path(path_to_convert):
         expanded_path = os.path.expanduser(path_to_convert)
-        if expanded_path.startswith('C:'):
-            expanded_path = expanded_path.replace('C:', 'Z:', 1)
         if not expanded_path.startswith('Z:'):
-            converted_path = 'Z:' + expanded_path.replace('\\', '/')
+            converted_path = 'Z:' + expanded_path
         else:
-            converted_path = expanded_path.replace('\\', '/')
+            converted_path = expanded_path
+        converted_path = converted_path.replace('/', '\\')
         return converted_path
 
 
@@ -195,8 +196,15 @@ class Heirloom(object):
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')
             cmd = [self._7zip_path, 'x', f'-o{self._base_install_dir}{folder_name}', '-y', self._tmp_dir + fn]
-        result = subprocess.run(' '.join(cmd), timeout=300, shell=True, check=True, capture_output=True)
-        return {'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+        if not self._quiet:
+            rprint(f'Running command: [yellow]{" ".join(cmd)}[/yellow]')
+        result = subprocess.run(cmd, timeout=300, capture_output=True)
+        if os.path.isdir(self._base_install_dir + folder_name):
+            install_dir = Path(self._base_install_dir + folder_name)
+            executable_files = [g for g in install_dir.glob('*.exe')]
+            return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+        else:
+            return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
 
     def uninstall_game(self):

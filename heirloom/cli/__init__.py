@@ -181,13 +181,13 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     if not game:
         game = select_from_games_list()
     result = heirloom.install_game(game, installation_method=install_method.value)
-    if result.get('stdout'):
-        console.print(result['stdout'])
-    if result.get('stderr'):
+    if result.get('status') == 'success':
         console.print(result)
-    if not result.get('stderr'):
+        if result.get('stdout'):
+            console.print(result['stdout'])
         console.print(f'Installation to [green]{result["install_path"]}[/green] successful!')
     else:
+        console.print(result)
         console.print(f'Installation received output to stderr, considering this installation [red italic]unsuccessful[/red italic]')
 
 
