@@ -5,8 +5,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from rich.progress import Progress
-from rich import print as rprint
-
+from rich.console import Console
 
 class Heirloom(object):
     def __init__(self, user, password, base_install_dir, **kwargs) -> None:
@@ -31,6 +30,7 @@ class Heirloom(object):
         self._base_install_wine_path = self.convert_to_wine_path(self._base_install_dir)
         self._wine_path = kwargs.get('wine_path') or shutil.which('wine')
         self._7zip_path = kwargs.get('7zip_path') or shutil.which('7z')
+        self._default_installation_method = kwargs.get('default_installation_method') or 'wine'
         self._quiet = kwargs.get('quiet') or False
         self._tmp_dir = kwargs.get('temp_dir') or os.path.expanduser('~/.heirloom.tmp/')
         self.games = []
@@ -178,8 +178,10 @@ class Heirloom(object):
         return game
 
 
-    def install_game(self, game_name, installation_method='wine'):
+    def install_game(self, game_name, installation_method=None):
         cmd = None
+        if not installation_method:
+            installation_method = self._default_installation_method
         if installation_method.lower() not in ('wine', '7zip'):
             raise AssertionError(f'Invalid installation method ("{installation_method}"); valid installation methods are: ["wine", "7zip"]')
         try:
@@ -197,14 +199,24 @@ class Heirloom(object):
                 raise AssertionError(f'7z executable not found!')
             cmd = [self._7zip_path, 'x', f'-o{self._base_install_dir}{folder_name}', '-y', self._tmp_dir + fn]
         if not self._quiet:
-            rprint(f'Running command: [yellow]{" ".join(cmd)}[/yellow]')
-        result = subprocess.run(cmd, timeout=300, capture_output=True)
-        if os.path.isdir(self._base_install_dir + folder_name):
-            install_dir = Path(self._base_install_dir + folder_name)
-            executable_files = [g for g in install_dir.glob('*.exe')]
-            return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+            console = Console()
+            console.print(f'[green]Installation method[/green] is [blue bold]{installation_method}[/blue bold]')
+            with console.status(f'Running command: [yellow]{" ".join(cmd)}[/yellow]'):
+                result = subprocess.run(cmd, timeout=300, capture_output=True)
+                if os.path.isdir(self._base_install_dir + folder_name):
+                    install_dir = Path(self._base_install_dir + folder_name)
+                    executable_files = [g.name for g in install_dir.glob('*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
+                    return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+                else:
+                    return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
         else:
-            return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+                result = subprocess.run(cmd, timeout=300, capture_output=True)
+                if os.path.isdir(self._base_install_dir + folder_name):
+                    install_dir = Path(self._base_install_dir + folder_name)
+                    executable_files = [g.name for g in install_dir.glob('*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
+                    return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+                else:
+                    return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
 
     def uninstall_game(self):

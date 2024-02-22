@@ -168,7 +168,7 @@ def download(game: Annotated[str, typer.Option(help='Game name to download, will
 @app.command('install')
 def install(game: Annotated[str, typer.Option(help='Game name to download, will be prompted if not provided')] = None,
             uuid: Annotated[str, typer.Option(help='UUID of game to download, will be prompted for game name if not provided')] = None,
-            install_method: Annotated[InstallationMethod, typer.Option(case_sensitive=False)] = InstallationMethod.wine):
+            install_method: Annotated[InstallationMethod, typer.Option(case_sensitive=False)] = None):
     """
     Installs a game from the Legacy Games library.    
     """
@@ -180,15 +180,19 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
         game = select_from_games_list()
-    result = heirloom.install_game(game, installation_method=install_method.value)
+    if install_method:
+        result = heirloom.install_game(game, installation_method=install_method.value)
+    else:
+        result = heirloom.install_game(game)
     if result.get('status') == 'success':
-        console.print(result)
-        if result.get('stdout'):
-            console.print(result['stdout'])
-        console.print(f'Installation to [green]{result["install_path"]}[/green] successful!')
+        console.print(f'Installation to [green]{result["install_path"]}[/green] successful! :grin:')
+        if result.get('executable_files') and len(result.get('executable_files')) == 1:
+            console.print(f'To start game, run: [yellow]{config["wine_path"]} {config["base_install_dir"]}{result["executable_files"][0]}[/yellow]')
+        elif result.get('executable_files') and len(result.get('executable_files')) > 1:
+            console.print(f':exclamation: Ambiguous executable detected; game may be any one of: {result.get("executable_files")}')
     else:
         console.print(result)
-        console.print(f'Installation received output to stderr, considering this installation [red italic]unsuccessful[/red italic]')
+        console.print(f'[bold]Installation [red italic]unsuccessful[/red italic]! :frowning:')
 
 
 @app.command('info')
