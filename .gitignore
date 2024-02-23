@@ -1,9 +1,10 @@
 *.pyc
-__pycache__
+__pycache__/
 .idea/
 .vscode/
 *.log
 *.exe
-.venv
-.virtualenv
-
+.venv/
+.virtualenv/
+build/
+heirloom.egg-info/
