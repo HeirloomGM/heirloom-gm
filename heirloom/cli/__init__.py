@@ -191,10 +191,15 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     if result.get('status') == 'success':
         console.print(f'Installation to [green]{result["install_path"]}[/green] successful! :grin:')
         if result.get('executable_files') and len(result.get('executable_files')) == 1:
-            console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{result["executable_files"][0]}\'[/yellow]')
+            executable_file = result.get('executable_files')[0].split('/')[-1]
+            console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{executable_file}\'')
+            answer = config["wine_path"] + '\'{result.get("install_path")}\\{executable_file}\''
         elif result.get('executable_files') and len(result.get('executable_files')) > 1:
-            console.print(f':exclamation: Ambiguous executable detected; game may be any one of: {result.get("executable_files")}')
-        write_game_record(game, uuid, result.get("install_path"))
+            console.print(f':exclamation: Ambiguous executable detected!')
+            answer = inquirer.select('Select the executable used to launch the game: ', choices=result.get('executable_files')).execute()
+            executable_file = answer.split('/')[-1]
+            console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{executable_file}\'')
+        write_game_record(game, uuid, answer)
     else:
         console.print(result)
         console.print(f'[bold]Installation was [red italic]unsuccessful[/red italic]! :frowning:')
