@@ -61,7 +61,7 @@ def init_games_db():
     existing = True if os.path.isfile(config_dir + 'games.db') else False
     db = sqlite3.connect(config_dir + 'games.db')
     if not existing:
-        sql = 'CREATE TABLE games(name text, uuid text primary key, install_dir text)'
+        sql = 'CREATE TABLE games(name text, uuid text primary key unique, install_dir text)'
         cursor = db.cursor()
         cursor.execute(sql)
         db.commit()

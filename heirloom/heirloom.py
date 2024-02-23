@@ -205,7 +205,7 @@ class Heirloom(object):
                 result = subprocess.run(cmd, timeout=300, capture_output=True)
                 if os.path.isdir(self._base_install_dir + folder_name):
                     install_dir = Path(self._base_install_dir + folder_name)
-                    executable_files = [g.name for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
+                    executable_files = [g.resolve() for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
                     return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
                 else:
                     return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
@@ -213,7 +213,7 @@ class Heirloom(object):
                 result = subprocess.run(cmd, timeout=300, capture_output=True)
                 if os.path.isdir(self._base_install_dir + folder_name):
                     install_dir = Path(self._base_install_dir + folder_name)
-                    executable_files = [g.name for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
+                    executable_files = [g.resolve() for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
                     return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
                 else:
                     return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
