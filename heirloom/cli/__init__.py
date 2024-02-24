@@ -1,20 +1,19 @@
 import atexit
-import base64
-import json
 import os
-import sqlite3
 import shutil
 import sys
 from enum import Enum
 
-import keyring
 import rich
 import typer
-from cryptography.fernet import Fernet
 from InquirerPy import inquirer
 from typing_extensions import Annotated
 
 from ..heirloom import Heirloom
+from ..password_functions import *
+from ..path_functions import *
+from ..database_functions import *
+from ..config import *
 
 
 console = rich.console.Console()
@@ -26,125 +25,6 @@ class InstallationMethod(str, Enum):
     sevenzip = '7zip'
     
 
-def get_config():
-    if not os.path.isdir(config_dir):
-        os.makedirs(config_dir)
-    config_file = config_dir + 'config.json'
-    if not os.path.isfile(config_file) or os.path.getsize(config_file) == 0:
-        console.print(f'Configuration file not found: [yellow]{config_file}[/yellow]')
-        console.print('Please enter your login credentials for Legacy Games.')
-        answers = {}
-        answers['user'] = inquirer.text('Enter username or email: ').execute()
-        answers['password'] = inquirer.secret('Enter password: ').execute()
-        answers['base_install_dir'] = inquirer.filepath('Enter base installation folder: ', default=os.path.expanduser('~/Games/LegacyGames/')).execute()
-        answers['wine_path'] = inquirer.text('Path to Wine executable: ', default=shutil.which('wine')).execute()
-        answers['7zip_path'] = inquirer.text('Path to 7zip executable: ', default=shutil.which('7z')).execute()
-        answers['default_installation_method'] = inquirer.select('Default installation method: ', choices=['7zip', 'wine'], default='7zip').execute()
-        save_file = inquirer.confirm(f'Save configuration file to {os.path.expanduser(config_file)}?').execute()
-        if save_file:
-            answers['password'] = encrypt_password(answers['password']).decode('utf-8')
-            with open(os.path.expanduser(config_file), 'w') as cf:
-                cf.write(json.dumps(answers, indent=4))
-            with open(os.path.expanduser(config_file), 'r') as f:
-                config_data = json.loads(f.read())
-                config_data['password'] = decrypt_password(config_data['password']).decode('utf-8')
-        else:
-            config_data = answers
-    else:
-        with open(os.path.expanduser(config_file), 'r') as f:
-            config_data = json.loads(f.read())
-            config_data['password'] = decrypt_password(config_data['password']).decode('utf-8')
-    return config_data
-
-
-def init_games_db():
-    existing = True if os.path.isfile(config_dir + 'games.db') else False
-    db = sqlite3.connect(config_dir + 'games.db')
-    if not existing:
-        sql = 'CREATE TABLE games(name TEXT, uuid TEXT PRIMARY KEY UNIQUE, install_dir TEXT)'
-        cursor = db.cursor()
-        cursor.execute(sql)
-        db.commit()
-    return db
-
-
-def write_game_record(name=None, uuid=None, install_dir=None):
-    if not config.get('db'):
-        db = init_games_db()
-    else:
-        db = config.get('db')
-    sql = "INSERT INTO games VALUES(?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET install_dir=excluded.install_dir"
-    cursor = db.cursor()    
-    if not name:
-        name = heirloom.get_name_from_uuid(uuid)
-    if not uuid:
-        uuid = heirloom.get_uuid_from_name(name)
-    cursor.execute(sql, (name, uuid, install_dir))
-    db.commit()
- 
-
-def read_game_record(name=None, uuid=None):
-    if not config.get('db'):
-        db = init_games_db()
-    else:
-        db = config.get('db')
-    if name:
-        sql = f"SELECT * FROM games WHERE name='{name}'"
-    elif uuid:
-        sql = f"SELECT * FROM GAMES WHERE uuid='{uuid}'"
-    else:
-        console.print(':exclamation: Must specify name or UUID for game!')
-        sys.exit(1)
-    cursor = db.cursor()
-    result = cursor.execute(sql)
-    record = result.fetchone()
-    return dict(zip(('name', 'uuid', 'install_dir'), record)) if record else None
-   
-
-def delete_game_record(name=None, uuid=None):
-    if not config.get('db'):
-        db = init_games_db()
-    else:
-        db = config.get('db')
-    if uuid:
-        sql = f"DELETE FROM games WHERE uuid='{uuid}'"
-    elif name:
-        sql = f"DELETE FROM games WHERE name='{name}'"
-    else:
-        console.print(':exclamation: Must specify name or UUID for game!')
-        sys.exit(1)
-    cursor = db.cursor()
-    cursor.execute(sql)
-    db.commit()
-
-
-def set_encryption_key():
-    key = Fernet.generate_key()
-    keyring.set_password('system', 'heirloom-encryption-key', base64.b64encode(key).decode('utf-8'))
-
-
-def get_encryption_key():
-    key = keyring.get_password('system', 'heirloom-encryption-key')
-    if key:
-        return base64.b64decode(key.encode('utf-8'))
-    else:
-        return None
-
-
-def encrypt_password(password):
-    key = get_encryption_key()
-    f = Fernet(key)
-    token = f.encrypt(password.encode('utf-8'))
-    return token
-
-
-def decrypt_password(password):
-    key = get_encryption_key()
-    f = Fernet(key)
-    token = f.decrypt(password.encode('utf-8'))
-    return token
-
-
 def select_from_games_list(installed_only=False):
     heirloom.refresh_games_list()
     if not installed_only:
@@ -152,22 +32,7 @@ def select_from_games_list(installed_only=False):
     else:
         game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games if g['install_dir'] != 'Not Installed']).execute()
     return game
-
-
-def refresh_game_status():
-    if not config.get('db'):
-        config['db'] = init_games_db()
-    db = config.get('db')
-    sql = "SELECT * FROM games WHERE install_dir != 'Not Installed'"
-    cursor = db.cursor()
-    result = [{'name': name, 'uuid': uuid, 'install_dir': install_dir} for (name, uuid, install_dir) in cursor.execute(sql).fetchall()]
-    for each in result:
-        if not os.path.exists(heirloom.convert_to_unix_path(each.get('install_dir'))):
-            sql = f"UPDATE games SET install_dir = 'Not Installed' WHERE uuid = '{each.get('uuid')}'"
-            result = cursor.execute(sql)
-            db.commit()
             
-
 
 @app.command('list')
 def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only list installed games')] = False,
@@ -179,23 +44,20 @@ def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only
         installed = False
         not_installed = False
     heirloom.refresh_games_list()
-    refresh_game_status()
+    refresh_game_status(config['db'])
     table = rich.table.Table(title='Legacy Games', box=rich.box.ROUNDED, show_lines=True)
     table.add_column("Game Name", justify="left", style="yellow")
     table.add_column("UUID", justify="center", style="green")
     table.add_column('Description', justify="left", style="white bold")
-    table.add_column("Installation Folder", justify="right", style="red")
     for g in heirloom.games:
-        record = read_game_record(name=g['game_name'])
+        record = read_game_record(config['db'], name=g['game_name'])
         if record:
-            install_folder = record['install_dir']
             if not_installed:
                 continue
         else:
-            install_folder = 'Not installed'
             if installed:
                 continue
-        table.add_row(g['game_name'], g['installer_uuid'], g['game_description'], install_folder)
+        table.add_row(g['game_name'], g['installer_uuid'], g['game_description'])
     console.print(table)
     
 
@@ -220,7 +82,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     """
     Installs a game from the Legacy Games library.    
     """
-    refresh_game_status()
+    refresh_game_status(config['db'])
     while not config.get('base_install_dir'):
         config['base_install_dir'] = input('Enter base installation folder: ')
     if not os.path.isdir(os.path.expanduser(config['base_install_dir'])):
@@ -245,7 +107,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
             executable_file = answer.split('/')[-1]
             console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{executable_file}\'')
             answer = f'{result.get("install_path")}\\{executable_file}'
-        write_game_record(game, uuid, answer)
+        write_game_record(config['db'], name=game, uuid=uuid, install_dir=result['install_path'], executable=answer)
     else:
         console.print(result)
         console.print(f'[bold]Installation was [red italic]unsuccessful[/red italic]! :frowning:')
@@ -270,7 +132,7 @@ def uninstall(game: Annotated[str, typer.Option(help='Game name to uninstall, wi
     """
     Uninstalls a game from the Legacy Games library.    
     """
-    refresh_game_status()
+    refresh_game_status(config['db'])
     if uuid:
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
@@ -279,7 +141,7 @@ def uninstall(game: Annotated[str, typer.Option(help='Game name to uninstall, wi
         result = heirloom.uninstall_game(game)
     if result.get('status') == 'success':
         console.print(f'Uninstallation of {game} successful! :grin:')
-        delete_game_record(uuid)
+        delete_game_record(config['db'], uuid=uuid)
     else:
         console.print(result)
         console.print(f'[bold]Installation was [red italic]unsuccessful[/red italic]! :frowning:')
@@ -300,8 +162,9 @@ encryption_key = get_encryption_key()
 if not encryption_key:
     set_encryption_key()
     encryption_key = get_encryption_key()
-config = get_config()
-config['db'] = init_games_db()
+configparser = get_config(config_dir)
+config = dict(configparser['HeirloomGM'])
+config['db'] = init_games_db(config_dir)
 heirloom = Heirloom(**config)
 try:
     with console.status('Logging in to Legacy Games...'):
@@ -313,7 +176,7 @@ except Exception as e:
 try:
     with console.status('Refreshing games list...'):
         heirloom.refresh_games_list()
-        refresh_game_status()
+        refresh_game_status(config['db'])
 except Exception as e:
     console.print(f':exclamation: Unable to refresh games list!')
     console.print(e)
