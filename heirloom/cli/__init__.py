@@ -61,7 +61,7 @@ def init_games_db():
     existing = True if os.path.isfile(config_dir + 'games.db') else False
     db = sqlite3.connect(config_dir + 'games.db')
     if not existing:
-        sql = 'CREATE TABLE games(name text, uuid text primary key unique, install_dir text)'
+        sql = 'CREATE TABLE games(name TEXT, uuid TEXT PRIMARY KEY UNIQUE, install_dir TEXT)'
         cursor = db.cursor()
         cursor.execute(sql)
         db.commit()
@@ -91,15 +91,32 @@ def read_game_record(name=None, uuid=None):
     if name:
         sql = f"SELECT * FROM games WHERE name='{name}'"
     elif uuid:
-        sql = f"SELECT * FROM GAMES WHERE uuidp'{uuid}'"
+        sql = f"SELECT * FROM GAMES WHERE uuid='{uuid}'"
     else:
-        console.print(':exclamation: Must specify name or UUID for game')
+        console.print(':exclamation: Must specify name or UUID for game!')
         sys.exit(1)
     cursor = db.cursor()
     result = cursor.execute(sql)
     record = result.fetchone()
     return dict(zip(('name', 'uuid', 'install_dir'), record)) if record else None
    
+
+def delete_game_record(name=None, uuid=None):
+    if not config.get('db'):
+        db = init_games_db()
+    else:
+        db = config.get('db')
+    if uuid:
+        sql = f"DELETE FROM games WHERE uuid='{uuid}'"
+    elif name:
+        sql = f"DELETE FROM games WHERE name='{name}'"
+    else:
+        console.print(':exclamation: Must specify name or UUID for game!')
+        sys.exit(1)
+    cursor = db.cursor()
+    cursor.execute(sql)
+    db.commit()
+
 
 def set_encryption_key():
     key = Fernet.generate_key()
@@ -128,9 +145,12 @@ def decrypt_password(password):
     return token
 
 
-def select_from_games_list():
+def select_from_games_list(installed_only=False):
     heirloom.refresh_games_list()
-    game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games]).execute()
+    if not installed_only:
+        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games]).execute()
+    else:
+        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games if g['install_dir'] != 'Not Installed']).execute()
     return game
 
 
@@ -140,12 +160,13 @@ def refresh_game_status():
     db = config.get('db')
     sql = "SELECT * FROM games WHERE install_dir != 'Not Installed'"
     cursor = db.cursor()
-    result = cursor.execute(sql).fetchall()
+    result = [{'name': name, 'uuid': uuid, 'install_dir': install_dir} for (name, uuid, install_dir) in cursor.execute(sql).fetchall()]
     for each in result:
-        if not os.path.exists(each.get('install_dir')):
+        if not os.path.exists(heirloom.convert_to_unix_path(each.get('install_dir'))):
             sql = f"UPDATE games SET install_dir = 'Not Installed' WHERE uuid = '{each.get('uuid')}'"
             result = cursor.execute(sql)
             db.commit()
+            
 
 
 @app.command('list')
@@ -158,6 +179,7 @@ def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only
         installed = False
         not_installed = False
     heirloom.refresh_games_list()
+    refresh_game_status()
     table = rich.table.Table(title='Legacy Games', box=rich.box.ROUNDED, show_lines=True)
     table.add_column("Game Name", justify="left", style="yellow")
     table.add_column("UUID", justify="center", style="green")
@@ -198,6 +220,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     """
     Installs a game from the Legacy Games library.    
     """
+    refresh_game_status()
     while not config.get('base_install_dir'):
         config['base_install_dir'] = input('Enter base installation folder: ')
     if not os.path.isdir(os.path.expanduser(config['base_install_dir'])):
@@ -242,10 +265,32 @@ def info(game: Annotated[str, typer.Option(help='Game name to download, will be 
 
 
 @app.command('uninstall')
-def uninstall():
+def uninstall(game: Annotated[str, typer.Option(help='Game name to uninstall, will be prompted if not provided')] = None,
+              uuid: Annotated[str, typer.Option(help='UUID of game to uninstall, will be prompted for game name if not provided')] = None):
+    """
+    Uninstalls a game from the Legacy Games library.    
+    """
+    refresh_game_status()
+    if uuid:
+        game = heirloom.get_game_from_uuid(uuid)
+    if not game:
+        game = select_from_games_list(installed_only=True)
+    else:
+        result = heirloom.uninstall_game(game)
+    if result.get('status') == 'success':
+        console.print(f'Uninstallation of {game} successful! :grin:')
+        delete_game_record(uuid)
+    else:
+        console.print(result)
+        console.print(f'[bold]Installation was [red italic]unsuccessful[/red italic]! :frowning:')
+        
+
+@app.command('launch')
+def launch(game: Annotated[str, typer.Option(help='Game name to uninstall, will be prompted if not provided')] = None,
+           uuid: Annotated[str, typer.Option(help='UUID of game to uninstall, will be prompted for game name if not provided')] = None):
     pass
-
-
+        
+        
 def main():
     app()
 
@@ -272,7 +317,7 @@ try:
 except Exception as e:
     console.print(f':exclamation: Unable to refresh games list!')
     console.print(e)
-    sys.exit(1)
+    raise(e)
 
 
 @atexit.register

@@ -52,7 +52,7 @@ class Heirloom(object):
     def convert_to_unix_path(path_to_convert):
         regex = re.compile('^[A-Z|a-z]:')
         if re.match(regex, path_to_convert):
-            path_to_convert = '/' + str().join(path_to_convert[:2]).replace('\\', '/')
+            path_to_convert = str().join(path_to_convert[2:]).replace('\\', '/')
         else:
             path_to_convert = path_to_convert.replace('\\', '/')
         return path_to_convert
@@ -189,7 +189,7 @@ class Heirloom(object):
         return game
 
 
-    def install_game(self, game_name, installation_method=None):
+    def install_game(self, game_name, installation_method=None, show_gui=False):
         cmd = None
         if not installation_method:
             installation_method = self._default_installation_method
@@ -204,7 +204,10 @@ class Heirloom(object):
         if installation_method.lower() == 'wine':
             if not self._wine_path or not os.path.exists(self._wine_path):
                 raise AssertionError(f'wine executable not found!')
-            cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+            if not show_gui:
+                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+            else:
+                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, f'/D={self._base_install_wine_path}{folder_name}']
         elif installation_method.lower() == '7zip':
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')
@@ -230,9 +233,18 @@ class Heirloom(object):
                     return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
 
 
-    def uninstall_game(self):
-        pass
-
+    def uninstall_game(self, game_name, install_dir):
+        try:
+            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
+        except StopIteration:
+            raise AssertionError(f'Unable to find game with name "{game_name}"')
+        if not self._quiet:
+            console = Console()
+            with console.status(f'[green]Uninstalling[/green] [white italic]{game_name}[/white italic]'):
+                pass # do delete
+        else:
+            pass # do delete silently
+        
 
     def get_game_from_uuid(self, uuid):
         if not self.games:
