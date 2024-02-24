@@ -32,11 +32,11 @@ class Heirloom(object):
         self._user_id = None
         self._base_install_dir = os.path.expanduser(base_install_dir)
         self._base_install_wine_path = convert_to_wine_path(self._base_install_dir)
-        self._wine_path = kwargs.get('wine_path') or shutil.which('wine')
-        self._7zip_path = kwargs.get('7zip_path') or shutil.which('7z')
-        self._default_installation_method = kwargs.get('default_installation_method') or 'wine'
-        self._quiet = kwargs.get('quiet') or False
-        self._tmp_dir = kwargs.get('temp_dir') or os.path.expanduser('~/.heirloom.tmp/')
+        self._wine_path = kwargs.get('wine_path', shutil.which('wine'))
+        self._7zip_path = kwargs.get('7zip_path', shutil.which('7z'))
+        self._default_installation_method = kwargs.get('default_installation_method', 'wine')
+        self._quiet = kwargs.get('quiet', False)
+        self._tmp_dir = kwargs.get('temp_dir', os.path.expanduser('~/.heirloom.tmp/'))
         self.games = []
 
 
@@ -61,8 +61,63 @@ class Heirloom(object):
             return response_json['data']['email']
         else:
             raise AssertionError(f'Could not get user profile for userId {user_id}!')
+
+    
+    def dump_game_data(self, game_name):
+        try:
+            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
+        except StopIteration:
+            raise AssertionError(f'Unable to find game with name "{game_name}"')
+        return game
     
     
+    def get_game_from_uuid(self, uuid):
+        if not self.games:
+            self.refresh_games_list()
+        try:
+            game = next((g for g in self.games if g.get('installer_uuid').lower() == uuid.lower()))
+            return game['game_name']
+        except StopIteration:
+            raise AssertionError(f'Unable to find game with UUID "{uuid}"')
+
+
+    def get_uuid_from_name(self, game_name):
+        if not self.games:
+            self.refresh_games_list()
+        try:
+            game = next((g for g in self.games if g.get('game_name').lower() == game_name.lower()))
+            return game['installer_uuid']
+        except StopIteration:
+            raise AssertionError(f'Unable to find game with name "{game_name}"')
+
+
+    def get_purchased_games(self):
+        if not self._user_id:
+            self._user_id = self.login()
+        product_catalog = self.get_product_catalog()
+        params = {
+            'userId': self._user_id
+        }
+        response = requests.get(self._purchased_games_url, headers=self._headers, params=params)
+        data = response.json().get('data')
+        if data:
+            purchased_games = [p for p in product_catalog if 'product_id' in p and p['product_id'] in [d['product_id'] for d in data]]
+        else:
+            purchased_games = []
+        games = []
+        for each_purchase in purchased_games:
+            games += each_purchase['games']
+        return games
+
+
+    def get_product_catalog(self):
+        if not self._user_id:
+            self._user_id = self.login()
+        response = requests.get(self._product_catalog_url, headers=self._headers)
+        product_catalog = response.json()
+        return product_catalog
+
+
     def get_giveaway_games(self):
         params = {
             'email': self.get_user_email()
@@ -163,14 +218,6 @@ class Heirloom(object):
         return coverart_url.split('/')[-1]
 
 
-    def dump_game_data(self, game_name):
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}"')
-        return game
-
-
     def install_game(self, game_name, installation_method=None, show_gui=False):
         cmd = None
         if not installation_method:
@@ -226,50 +273,3 @@ class Heirloom(object):
                 pass # do delete
         else:
             pass # do delete silently
-        
-
-    def get_game_from_uuid(self, uuid):
-        if not self.games:
-            self.refresh_games_list()
-        try:
-            game = next((g for g in self.games if g.get('installer_uuid').lower() == uuid.lower()))
-            return game['game_name']
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with UUID "{uuid}"')
-
-
-    def get_uuid_from_name(self, game_name):
-        if not self.games:
-            self.refresh_games_list()
-        try:
-            game = next((g for g in self.games if g.get('game_name').lower() == game_name.lower()))
-            return game['installer_uuid']
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}"')
-
-
-    def get_purchased_games(self):
-        if not self._user_id:
-            self._user_id = self.login()
-        product_catalog = self.get_product_catalog()
-        params = {
-            'userId': self._user_id
-        }
-        response = requests.get(self._purchased_games_url, headers=self._headers, params=params)
-        data = response.json().get('data')
-        if data:
-            purchased_games = [p for p in product_catalog if 'product_id' in p and p['product_id'] in [d['product_id'] for d in data]]
-        else:
-            purchased_games = []
-        games = []
-        for each_purchase in purchased_games:
-            games += each_purchase['games']
-        return games
-
-
-    def get_product_catalog(self):
-        if not self._user_id:
-            self._user_id = self.login()
-        response = requests.get(self._product_catalog_url, headers=self._headers)
-        product_catalog = response.json()
-        return product_catalog
