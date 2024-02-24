@@ -134,11 +134,29 @@ def select_from_games_list():
     return game
 
 
+def refresh_game_status():
+    if not config.get('db'):
+        config['db'] = init_games_db()
+    db = config.get('db')
+    sql = "SELECT * FROM games WHERE install_dir != 'Not Installed'"
+    cursor = db.cursor()
+    result = cursor.execute(sql).fetchall()
+    for each in result:
+        if not os.path.exists(each.get('install_dir')):
+            sql = f"UPDATE games SET install_dir = 'Not Installed' WHERE uuid = '{each.get('uuid')}'"
+            result = cursor.execute(sql)
+            db.commit()
+
+
 @app.command('list')
-def list_games():
+def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only list installed games')] = False,
+               not_installed: Annotated[bool, typer.Option('--not-installed', help='Only list games that are NOT installed')] = False):
     """
     Lists games in your Legacy Games library.
     """
+    if installed and not_installed:  # Two negatives makes a positive!
+        installed = False
+        not_installed = False
     heirloom.refresh_games_list()
     table = rich.table.Table(title='Legacy Games', box=rich.box.ROUNDED, show_lines=True)
     table.add_column("Game Name", justify="left", style="yellow")
@@ -149,8 +167,12 @@ def list_games():
         record = read_game_record(name=g['game_name'])
         if record:
             install_folder = record['install_dir']
+            if not_installed:
+                continue
         else:
             install_folder = 'Not installed'
+            if installed:
+                continue
         table.add_row(g['game_name'], g['installer_uuid'], g['game_description'], install_folder)
     console.print(table)
     
@@ -193,12 +215,13 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
         if result.get('executable_files') and len(result.get('executable_files')) == 1:
             executable_file = result.get('executable_files')[0].split('/')[-1]
             console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{executable_file}\'')
-            answer = config["wine_path"] + '\'{result.get("install_path")}\\{executable_file}\''
+            answer = f'{result.get("install_path")}\\{executable_file}'
         elif result.get('executable_files') and len(result.get('executable_files')) > 1:
             console.print(f':exclamation: Ambiguous executable detected!')
             answer = inquirer.select('Select the executable used to launch the game: ', choices=result.get('executable_files')).execute()
             executable_file = answer.split('/')[-1]
             console.print(f'To start game, run: [yellow]{config["wine_path"]} \'{result.get("install_path")}\\{executable_file}\'')
+            answer = f'{result.get("install_path")}\\{executable_file}'
         write_game_record(game, uuid, answer)
     else:
         console.print(result)
@@ -245,6 +268,7 @@ except Exception as e:
 try:
     with console.status('Refreshing games list...'):
         heirloom.refresh_games_list()
+        refresh_game_status()
 except Exception as e:
     console.print(f':exclamation: Unable to refresh games list!')
     console.print(e)
