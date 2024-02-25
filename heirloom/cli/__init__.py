@@ -1,7 +1,6 @@
 import atexit
 import os
 import shutil
-import sys
 from enum import Enum
 
 import rich
@@ -27,12 +26,27 @@ class InstallationMethod(str, Enum):
 
 def select_from_games_list(installed_only=False):
     heirloom.refresh_games_list()
+    games = heirloom.games
     if not installed_only:
-        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games]).execute()
+        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in games]).execute()
     else:
-        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in heirloom.games if g['install_dir'] != 'Not Installed']).execute()
+        game = inquirer.select(message='Select a game: ', choices=[g['game_name'] for g in games if g['install_dir'] != 'Not Installed']).execute()
     return game
-            
+
+
+def merge_game_data_with_db():
+    games = heirloom.games
+    for each_game in games:
+        record = read_game_record(config['db'], uuid=each_game['installer_uuid'])
+        if not record:
+            console.print(f':exclamation: Unable to read game record for UUID [green]{each_game["installer_uuid"]}[/green]!')
+            record = read_game_record(config['db'], name=each_game['game_name'])
+            if not record:
+                console.print(f':warning: Unable to read game record for game name [blue]{each_game["game_name"]}[/blue]!')
+        each_game['install_dir'] = record.get('install_dir', 'Not Installed')
+        each_game['executable'] = record.get('executable', 'Not Installed')
+    heirloom.games = games
+
 
 @app.command('list')
 def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only list installed games')] = False,
@@ -51,10 +65,10 @@ def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only
     table.add_column('Description', justify="left", style="white bold")
     for g in heirloom.games:
         record = read_game_record(config['db'], name=g['game_name'])
-        if record:
+        if record and record['install_dir'] != 'Not Installed':
             if not_installed:
                 continue
-        else:
+        elif record and record['install_dir'] == 'Not Installed':
             if installed:
                 continue
         table.add_row(g['game_name'], g['installer_uuid'], g['game_description'])
@@ -83,14 +97,18 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     Installs a game from the Legacy Games library.    
     """
     refresh_game_status(config['db'])
+    merge_game_data_with_db()
     while not config.get('base_install_dir'):
         config['base_install_dir'] = input('Enter base installation folder: ')
     if not os.path.isdir(os.path.expanduser(config['base_install_dir'])):
         os.makedirs(os.path.expanduser(config['base_install_dir']))
-    if uuid:
-        game = heirloom.get_game_from_uuid(uuid)
-    if not game:
+    if not game and not uuid:
         game = select_from_games_list()
+        uuid = heirloom.get_uuid_from_name(game)
+    if uuid and not game:
+        game = heirloom.get_game_from_uuid(uuid)
+    if game and not uuid:
+        uuid = heirloom.get_uuid_from_name(game)
     if install_method:
         result = heirloom.install_game(game, installation_method=install_method.value)
     else:
@@ -120,6 +138,7 @@ def info(game: Annotated[str, typer.Option(help='Game name to download, will be 
     Prints a JSON blob representing a game from the Legacy Games API.
     """
     if uuid:
+        merge_game_data_with_db()
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
         game = select_from_games_list()
@@ -150,7 +169,17 @@ def uninstall(game: Annotated[str, typer.Option(help='Game name to uninstall, wi
 @app.command('launch')
 def launch(game: Annotated[str, typer.Option(help='Game name to uninstall, will be prompted if not provided')] = None,
            uuid: Annotated[str, typer.Option(help='UUID of game to uninstall, will be prompted for game name if not provided')] = None):
-    pass
+    """
+    Launches an installed game.
+    """
+    if not game:
+        game = select_from_games_list(installed_only=True)
+    if uuid:
+        game = heirloom.get_game_from_uuid(uuid)
+    else:
+        uuid = heirloom.get_uuid_from_name(game['game_name'])
+    record = heirloom.read_game_record(uuid=uuid)
+    rich.print(record)
         
         
 def main():
@@ -164,7 +193,6 @@ if not encryption_key:
     encryption_key = get_encryption_key()
 configparser = get_config(config_dir)
 config = dict(configparser['HeirloomGM'])
-config['db'] = init_games_db(config_dir)
 heirloom = Heirloom(**config)
 try:
     with console.status('Logging in to Legacy Games...'):
@@ -172,11 +200,15 @@ try:
 except Exception as e:
     console.print(f':exclamation: Unable to log in to Legacy Games!')
     console.print(e)
-    sys.exit(1)
+    raise(e)
 try:
     with console.status('Refreshing games list...'):
         heirloom.refresh_games_list()
-        refresh_game_status(config['db'])
+    with console.status('Initializing database...'):
+        config['db'] = init_games_db(config_dir, heirloom.games)
+    with console.status('Merging database into game data...'):
+        merge_game_data_with_db()
+    refresh_game_status(config['db'])
 except Exception as e:
     console.print(f':exclamation: Unable to refresh games list!')
     console.print(e)

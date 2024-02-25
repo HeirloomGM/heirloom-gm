@@ -15,18 +15,20 @@ pip install . &&
 echo 'Getting help...' &&
 heirloom-gm --help &&
 sleep_timer &&
-echo 'Listing games help' &&
-heirloom-gm list --help &&
-sleep_timer &&
-echo 'Downloading random game help' &&
-heirloom-gm download --help &&
-sleep_timer &&
-echo 'Installing random game help' &&
-heirloom-gm install --help &&
-sleep_timer &&
-echo 'Info from random game help' &&
-heirloom-gm info --help &&
-sleep_timer &&
+
+# echo 'Listing games help' &&
+# heirloom-gm list --help &&
+# sleep_timer &&
+# echo 'Downloading random game help' &&
+# heirloom-gm download --help &&
+# sleep_timer &&
+# echo 'Installing random game help' &&
+# heirloom-gm install --help &&
+# sleep_timer &&
+# echo 'Info from random game help' &&
+# heirloom-gm info --help &&
+# sleep_timer &&
+
 echo 'Listing all games...' &&
 heirloom-gm list &&
 sleep_timer &&

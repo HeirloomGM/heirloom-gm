@@ -32,7 +32,7 @@ def get_config(config_dir):
                 config_data.read_file(cf)
                 config_data.set('HeirloomGM', 'password', decrypt_password(config_data.get('HeirloomGM', 'password')).decode('utf-8'))
         else:
-            config_data = config_parser['HeirloomGM']
+            config_data = config_parser
     else:
         with open(os.path.expanduser(config_file), 'r') as cf:
             config_data = ConfigParser(default_section='HeirloomGM')
