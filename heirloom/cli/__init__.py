@@ -1,6 +1,7 @@
 import atexit
 import os
 import shutil
+import subprocess
 from enum import Enum
 
 import rich
@@ -177,9 +178,12 @@ def launch(game: Annotated[str, typer.Option(help='Game name to uninstall, will 
     if uuid:
         game = heirloom.get_game_from_uuid(uuid)
     else:
-        uuid = heirloom.get_uuid_from_name(game['game_name'])
-    record = heirloom.read_game_record(uuid=uuid)
-    rich.print(record)
+        uuid = heirloom.get_uuid_from_name(game)
+    record = read_game_record(config['db'], uuid=uuid)
+    cmd = [config['wine_path'], f"'{record['executable']}'"]
+    with console.status(f"Running: [yellow]{' '.join(cmd)}[/yellow]"):
+        result = subprocess.run(cmd, capture_output=True)
+        console.print(result.stdout)
         
         
 def main():
