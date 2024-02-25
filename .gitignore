@@ -8,3 +8,4 @@ __pycache__/
 .virtualenv/
 build/
 heirloom.egg-info/
+test.sh
