@@ -59,7 +59,7 @@ def list_games(installed: Annotated[bool, typer.Option('--installed', help='Only
         installed = False
         not_installed = False
     heirloom.refresh_games_list()
-    refresh_game_status(config['db'])
+    refresh_game_installation_status(config['db'])
     table = rich.table.Table(title='Legacy Games', box=rich.box.ROUNDED, show_lines=True)
     table.add_column("Game Name", justify="left", style="yellow")
     table.add_column("UUID", justify="center", style="green")
@@ -97,7 +97,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to download, will 
     """
     Installs a game from the Legacy Games library.    
     """
-    refresh_game_status(config['db'])
+    refresh_game_installation_status(config['db'])
     merge_game_data_with_db()
     while not config.get('base_install_dir'):
         config['base_install_dir'] = input('Enter base installation folder: ')
@@ -143,7 +143,7 @@ def info(game: Annotated[str, typer.Option(help='Game name to download, will be 
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
         game = select_from_games_list()
-    rich.pretty.pprint(heirloom.dump_game_data(game))
+    console.print(heirloom.dump_game_data(game))
 
 
 @app.command('uninstall')
@@ -152,7 +152,7 @@ def uninstall(game: Annotated[str, typer.Option(help='Game name to uninstall, wi
     """
     Uninstalls a game from the Legacy Games library.    
     """
-    refresh_game_status(config['db'])
+    refresh_game_installation_status(config['db'])
     if uuid:
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
@@ -183,7 +183,7 @@ def launch(game: Annotated[str, typer.Option(help='Game name to uninstall, will 
     cmd = [config['wine_path'], f"'{record['executable']}'"]
     with console.status(f"Running: [yellow]{' '.join(cmd)}[/yellow]"):
         result = subprocess.run(cmd, capture_output=True)
-        console.print(result.stdout)
+        console.print(result.stdout.encode('utf-8'))
         
         
 def main():
@@ -212,7 +212,7 @@ try:
         config['db'] = init_games_db(config_dir, heirloom.games)
     with console.status('Merging database into game data...'):
         merge_game_data_with_db()
-    refresh_game_status(config['db'])
+    refresh_game_installation_status(config['db'])
 except Exception as e:
     console.print(f':exclamation: Unable to refresh games list!')
     console.print(e)

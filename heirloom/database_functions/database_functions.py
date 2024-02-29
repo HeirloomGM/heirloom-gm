@@ -62,7 +62,7 @@ def delete_game_record(db, name=None, uuid=None):
     db.commit()
 
 
-def refresh_game_status(db):
+def refresh_game_installation_status(db):
     """
     This function is used to detect manual uninstallations. If the installation directory isn't found,
     set the install_dir to "Not Installed".
