@@ -138,8 +138,8 @@ def info(game: Annotated[str, typer.Option(help='Game name to download, will be 
     """
     Prints a JSON blob representing a game from the Legacy Games API.
     """
+    merge_game_data_with_db()
     if uuid:
-        merge_game_data_with_db()
         game = heirloom.get_game_from_uuid(uuid)
     if not game:
         game = select_from_games_list()
