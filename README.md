@@ -1,4 +1,4 @@
-# Heirloom Games Manager
+![HGM Logo](https://github.com/HeirloomGM/heirloom-gm/raw/main/docs/images/heirloom.png "Heirloom Games Manager") 
 
 Heirloom is a library and command line tool for accessing one's game library from [Legacy Games](https://www.legacygames.com) on Linux.
 
