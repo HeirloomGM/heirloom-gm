@@ -1,11 +1,11 @@
 *.pyc
-__pycache__
+__pycache__/
 .idea/
 .vscode/
 *.log
 *.exe
+<<<<<<< HEAD
 .venv
 .virtualenv
 *.egg-info
 build
-
