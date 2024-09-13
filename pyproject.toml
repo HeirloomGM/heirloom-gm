@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "heirloom"
-version = "0.1.37"
+version = "0.1.39"
 description = "Heirloom Games Manager, a Linux frontend for Legacy Games"
 authors = ["Jason Tripp <jason.a.tripp@gmail.com>"]
 license = "MIT"

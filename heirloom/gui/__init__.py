@@ -124,7 +124,7 @@ def show_progress_window():
 
 
 def show_about_window():
-    about_window = tk.Toplevel(window)
+    about_window = tk.Toplevel(window, bg='black')
     about_window.title("About Heirloom Games Manager")
     about_window.geometry("400x300")  # Increased height to fit the image
 
@@ -144,17 +144,17 @@ def show_about_window():
     logo_photo = ImageTk.PhotoImage(logo_image)
 
     # Create a label for the image
-    logo_label = tk.Label(about_window, image=logo_photo)
+    logo_label = tk.Label(about_window, image=logo_photo, bg="black")
     logo_label.image = logo_photo  # Keep a reference to avoid garbage collection
     logo_label.pack(pady=10)
 
     # Create a label with the about text
     about_text = f"Heirloom Games Manager\n\nVersion {version}\n\nDeveloped by: {authors}\n\nLicense: {license}"
-    text_label = tk.Label(about_window, text=about_text, font=("Arial", 12))
+    text_label = tk.Label(about_window, text=about_text, font=("Roboto", 12, "bold"), bg="black", fg="white")
     text_label.pack(pady=10)
 
     # Create a button to close the window
-    close_button = tk.Button(about_window, text="Close", command=about_window.destroy)
+    close_button = tk.Button(about_window, text="Close", bg="green", fg="white", command=about_window.destroy)
     close_button.pack(pady=10)
     
 
@@ -256,7 +256,7 @@ def create_main_window():
         text_widget.pack(side=tk.LEFT, padx=10)
         
         # Create the Install button
-        install_button = tk.Button(tile_frame, text="Install", bg="green", fg="white", command=lambda: heirloom.install_game(each_tile.title))
+        install_button = tk.Button(tile_frame, text="Install", bg="green", fg="white", command=lambda title=each_tile.title: heirloom.install_game(title))
         install_button.pack(side=tk.LEFT, padx=10, pady=10)
 
 
@@ -289,7 +289,7 @@ distribution = importlib.metadata.distribution('heirloom')
 metadata = distribution.metadata
 version = metadata.get('Version', 'N/A')
 license = metadata.get('License', 'N/A')
-authors = metadata.get('Authors', 'N/A')
+authors = metadata.get('Author', 'N/A')
 
 config_dir = os.path.expanduser('~/.config/heirloom/')
 encryption_key = get_encryption_key()
@@ -301,19 +301,19 @@ configparser = get_config(config_dir)
 config = dict(configparser['HeirloomGM'])
 heirloom = Heirloom(**config)
 try:
-    console.print(Text('Logging in...', style='bold green'))
-    user_id = heirloom.login()
+    with console.status(Text('Logging in...', style='bold')):
+        user_id = heirloom.login()
 except Exception as e:
     console.print(Text('Failed to login. Exiting...', style='bold red'))
     raise(e)
 try:
-    console.print(Text('Fetching games list...', style='bold green'))
-    heirloom.refresh_games_list()
+    with console.status(Text('Fetching games list...', style='bold')):
+        heirloom.refresh_games_list()
     config['db'] = init_games_db(config_dir, heirloom.games)
-    console.print(Text('Merging game data with database...', style='bold green'))
-    merge_game_data_with_db()
-    console.print(Text('Refreshing game installation status...', style='bold green'))
-    refresh_game_installation_status(config['db'])
+    with console.status(Text('Merging game data with database...', style='bold')):
+        merge_game_data_with_db()
+    with console.status(Text('Refreshing game installation status...', style='bold')):
+        refresh_game_installation_status(config['db'])
 except Exception as e:
     console.print(Text('Failed to fetch games list. Exiting...', style='bold red'))
     raise(e)
