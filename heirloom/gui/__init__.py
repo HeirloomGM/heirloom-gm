@@ -129,8 +129,8 @@ def show_about_window():
     about_window.geometry("400x300")  # Increased height to fit the image
 
     # Center the about window on the screen
-    window_width = 400
-    window_height = 300  # Increased height
+    window_width = 640
+    window_height = 400 # Increased height
     screen_width = about_window.winfo_screenwidth()
     screen_height = about_window.winfo_screenheight()
     x = (screen_width - window_width) // 2
@@ -149,7 +149,7 @@ def show_about_window():
     logo_label.pack(pady=10)
 
     # Create a label with the about text
-    about_text = f"Heirloom Games Manager\n\nVersion {version}\n\nDeveloped by: \n\nLicense: {license}"
+    about_text = f"Heirloom Games Manager\n\nVersion {version}\n\nDeveloped by: {authors}\n\nLicense: {license}"
     text_label = tk.Label(about_window, text=about_text, font=("Arial", 12))
     text_label.pack(pady=10)
 
@@ -289,6 +289,7 @@ distribution = importlib.metadata.distribution('heirloom')
 metadata = distribution.metadata
 version = metadata.get('Version', 'N/A')
 license = metadata.get('License', 'N/A')
+authors = metadata.get('Authors', 'N/A')
 
 config_dir = os.path.expanduser('~/.config/heirloom/')
 encryption_key = get_encryption_key()
