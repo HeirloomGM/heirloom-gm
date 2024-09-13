@@ -1,19 +1,29 @@
-[build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "heirloom"
-version = "0.1.32"
-dependencies = [
-    "requests",
-    "typer",
-    "rich",
-    "InquirerPy",
-    "keyring",
-    "cryptography"
+version = "0.1.37"
+description = "Heirloom Games Manager, a Linux frontend for Legacy Games"
+authors = ["Jason Tripp <jason.a.tripp@gmail.com>"]
+license = "MIT"
+include = [
+    "heirloom/images/*.png",
+    "heirloom/gui/fonts/*.ttf"
 ]
-requires-python = ">= 3.10"
 
-[project.scripts]
+[tool.poetry.dependencies]
+python = ">=3.10"
+requests = "*"
+typer = "*"
+rich = "*"
+InquirerPy = "*"
+keyring = "*"
+cryptography = "*"
+dearpygui = "*"
+pillow = "*"
+
+[tool.poetry.scripts]
 heirloom-gm = "heirloom.cli:main"
+heirloom-gui = "heirloom.gui:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

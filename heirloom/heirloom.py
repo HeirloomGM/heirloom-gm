@@ -273,3 +273,11 @@ class Heirloom(object):
                 pass # do delete
         else:
             pass # do delete silently
+        
+    
+    def cleanup_temp_dir(self):
+        if not self._quiet:
+            console = Console()
+            console.print(f'[bold green]Cleaning up temporary directory...[/bold green]')
+        if os.path.isdir(self._tmp_dir):
+            shutil.rmtree(self._tmp_dir)

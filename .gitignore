@@ -4,8 +4,8 @@ __pycache__/
 .vscode/
 *.log
 *.exe
-<<<<<<< HEAD
 .venv
 .virtualenv
 *.egg-info
-build
+build/
+tests/

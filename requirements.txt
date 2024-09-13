@@ -4,3 +4,6 @@ rich
 InquirerPy
 cryptography
 keyring
+dearpygui
+pillow
+poetry
