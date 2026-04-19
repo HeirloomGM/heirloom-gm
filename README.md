@@ -27,7 +27,7 @@ I always prefer to work in a virtual environment:
 ```bash
 python3 -m venv ~/heirloom.venv
 source ~/heirloom.venv/bin/activate
-pip install git+https://github.com/heirloom-gm/heirloom-gm
+pip install git+https://github.com/HeirloomGM/heirloom-gm
 ```
 
 
