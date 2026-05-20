@@ -47,6 +47,7 @@ class Heirloom(object):
             self._user_id = response_json['data'].get('userId')
             return response_json['data'].get('userId')
         else:
+            print(response.content)
             raise AssertionError('Did not find userId in login response!')
     
     
@@ -278,6 +279,10 @@ class Heirloom(object):
     def cleanup_temp_dir(self):
         if not self._quiet:
             console = Console()
-            console.print(f'[bold green]Cleaning up temporary directory...[/bold green]')
-        if os.path.isdir(self._tmp_dir):
-            shutil.rmtree(self._tmp_dir)
+            with console.status(f'Cleaning up temporary directory...', spinner='earth'):
+                if os.path.isdir(self._tmp_dir):
+                    shutil.rmtree(self._tmp_dir)
+        else:
+            if os.path.isdir(self._tmp_dir):
+                shutil.rmtree(self._tmp_dir)
+    

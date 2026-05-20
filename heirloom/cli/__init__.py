@@ -1,6 +1,5 @@
 import atexit
 import os
-import shutil
 import subprocess
 from enum import Enum
 
@@ -221,6 +220,6 @@ except Exception as e:
 
 @atexit.register
 def cleanup_temp_dir():
-    if os.path.isdir(heirloom._tmp_dir):
-        shutil.rmtree(heirloom._tmp_dir)
+    with console.status('Cleaning up temporary directory...', spinner='dots'):
+        heirloom.cleanup_temp_dir()
 

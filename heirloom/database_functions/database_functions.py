@@ -40,7 +40,7 @@ def read_game_record(db, name=None, uuid=None):
         sql = f"SELECT * FROM games WHERE name='{name}'"
     if uuid:
         sql = f"SELECT * FROM games WHERE uuid='{uuid}'"
-    if not sql:
+    if not any((name, uuid)):
         Console().print(f':exclamation: Must specify name or UUID for game!')
         sys.exit(1)
     cursor = db.cursor()

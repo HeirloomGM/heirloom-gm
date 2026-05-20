@@ -1,0 +1,7 @@
+#!/usr/bin/env /usr/bin/zsh
+
+. /home/jason/heirloom/.venv/bin/activate
+
+heirloom-gui
+
+
