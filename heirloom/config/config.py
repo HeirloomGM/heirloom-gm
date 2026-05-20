@@ -44,6 +44,11 @@ def get_config(config_dir):
             try:
                 password = decrypt_password(password).decode('utf-8')
             except Exception:
+                if password.startswith('gAAAA'):
+                    raise RuntimeError(
+                        'Stored password is encrypted, but the matching encryption key was not found. '
+                        'Re-run configuration or restore the original keyring entry.'
+                    )
                 console.print(':warning: Stored password is not encrypted; using it as-is.')
             config_data.set('HeirloomGM', 'password', password)
     return config_data

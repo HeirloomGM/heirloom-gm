@@ -10,6 +10,8 @@ except ModuleNotFoundError:
 
 SERVICE_NAME = 'heirloom-gm'
 KEY_NAME = 'encryption-key'
+LEGACY_SERVICE_NAME = 'system'
+LEGACY_KEY_NAME = 'heirloom-encryption-key'
 FALLBACK_KEY_FILE = Path('~/.config/heirloom/encryption.key').expanduser()
 
 
@@ -36,14 +38,17 @@ def set_encryption_key():
 
 
 def get_encryption_key():
-    try:
-        if keyring is None:
-            raise RuntimeError('keyring is not available')
-        key = keyring.get_password(SERVICE_NAME, KEY_NAME)
-    except Exception:
-        key = None
-    if key:
-        return base64.b64decode(key.encode('utf-8'))
+    if keyring is not None:
+        for service_name, key_name in (
+            (SERVICE_NAME, KEY_NAME),
+            (LEGACY_SERVICE_NAME, LEGACY_KEY_NAME),
+        ):
+            try:
+                key = keyring.get_password(service_name, key_name)
+            except Exception:
+                key = None
+            if key:
+                return base64.b64decode(key.encode('utf-8'))
     return _read_key_file()
 
 
