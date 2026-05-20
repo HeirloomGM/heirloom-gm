@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 from rich.progress import Progress
 from rich.console import Console
 
@@ -13,6 +14,8 @@ from .path_functions import *
 
 class Heirloom(object):
     def __init__(self, user, password, base_install_dir, **kwargs) -> None:
+        self._session = requests.Session()
+        self._request_timeout = kwargs.get('request_timeout', 30)
         self._encoded_password = base64.b64encode(f'{user}:{password}'.encode('utf-8')).decode('utf-8')
         self._headers = {
             'accept': 'application/json',
@@ -30,19 +33,86 @@ class Heirloom(object):
         self._purchase_download_url = self._api_url + '/products/download'
         self._profile_url = self._api_url + '/users/profile'
         self._user_id = None
-        self._base_install_dir = os.path.expanduser(base_install_dir)
-        self._base_install_wine_path = convert_to_wine_path(self._base_install_dir)
+        self._base_install_dir = Path(base_install_dir).expanduser()
+        self._base_install_wine_path = convert_to_wine_path(self._base_install_dir.as_posix())
         self._wine_path = kwargs.get('wine_path', shutil.which('wine'))
         self._7zip_path = kwargs.get('7zip_path', shutil.which('7z'))
         self._default_installation_method = kwargs.get('default_installation_method', 'wine')
         self._quiet = kwargs.get('quiet', False)
-        self._tmp_dir = kwargs.get('temp_dir', os.path.expanduser('~/.heirloom.tmp/'))
+        self._tmp_dir = Path(kwargs.get('temp_dir', '~/.heirloom.tmp/')).expanduser()
         self.games = []
 
 
+    def _get_json(self, url, **kwargs):
+        response = self._session.get(
+            url,
+            headers=kwargs.pop('headers', self._headers),
+            timeout=self._request_timeout,
+            **kwargs,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+    def _download_file(self, url, output_dir, description):
+        output_path = Path(output_dir).expanduser()
+        output_path.mkdir(parents=True, exist_ok=True)
+        filename = unquote(Path(urlparse(url).path).name)
+        if not filename:
+            raise AssertionError(f'Unable to determine filename from URL: {url}')
+        destination = output_path / filename
+        response = self._session.get(url, stream=True, timeout=self._request_timeout)
+        response.raise_for_status()
+        total_size = int(response.headers.get('content-length', 0))
+        block_size = 1024 * 128
+        with destination.open('wb') as f:
+            if not self._quiet:
+                with Progress() as progress_bar:
+                    download_task = progress_bar.add_task(description, total=total_size)
+                    for data in response.iter_content(block_size):
+                        if data:
+                            progress_bar.update(download_task, advance=len(data))
+                            f.write(data)
+            else:
+                for data in response.iter_content(block_size):
+                    if data:
+                        f.write(data)
+        return filename
+
+
+    def _find_game(self, game_name):
+        if not self.games:
+            self.refresh_games_list()
+        try:
+            return next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
+        except StopIteration:
+            raise AssertionError(f'Unable to find game with name "{game_name}"')
+
+
+    def _install_folder_name(self, installer_filename):
+        folder_name = '_'.join(installer_filename.split('_')[:-1])
+        return folder_name or Path(installer_filename).stem
+
+
+    def _unix_install_dir(self, install_dir):
+        return Path(convert_to_unix_path(str(install_dir))).expanduser()
+
+
+    def _ensure_install_dir_is_safe(self, install_dir):
+        base_dir = self._base_install_dir.resolve()
+        target_dir = self._unix_install_dir(install_dir).resolve()
+        if target_dir == base_dir or base_dir not in target_dir.parents:
+            raise AssertionError(f'Refusing to uninstall outside configured install directory: {target_dir}')
+        return target_dir
+
+
+    def _wine_install_path(self, folder_name):
+        base = self._base_install_wine_path.rstrip('\\/')
+        return f'{base}\\{folder_name}'
+
+
     def login(self):
-        response = requests.get(self._login_url, headers=self._headers)
-        response_json = response.json()
+        response_json = self._get_json(self._login_url)
         if response_json.get('data') and type(response_json.get('data')) == dict and response_json['data'].get('userId'):
             self._user_id = response_json['data'].get('userId')
             return response_json['data'].get('userId')
@@ -55,8 +125,7 @@ class Heirloom(object):
         params = {
             'userId': user_id
         }
-        response = requests.get(self._profile_url, headers=self._headers, params=params)
-        response_json = response.json()
+        response_json = self._get_json(self._profile_url, params=params)
         if response_json.get('data') and response_json['data'].get('email'):
             return response_json['data']['email']
         else:
@@ -64,11 +133,7 @@ class Heirloom(object):
 
     
     def dump_game_data(self, game_name):
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}"')
-        return game
+        return self._find_game(game_name)
     
     
     def get_game_from_uuid(self, uuid):
@@ -98,8 +163,7 @@ class Heirloom(object):
         params = {
             'userId': self._user_id
         }
-        response = requests.get(self._purchased_games_url, headers=self._headers, params=params)
-        data = response.json().get('data')
+        data = self._get_json(self._purchased_games_url, params=params).get('data')
         if data:
             purchased_games = [p for p in product_catalog if 'product_id' in p and p['product_id'] in [d['product_id'] for d in data]]
         else:
@@ -113,17 +177,14 @@ class Heirloom(object):
     def get_product_catalog(self):
         if not self._user_id:
             self._user_id = self.login()
-        response = requests.get(self._product_catalog_url, headers=self._headers)
-        product_catalog = response.json()
-        return product_catalog
+        return self._get_json(self._product_catalog_url)
 
 
     def get_giveaway_games(self):
         params = {
             'email': self.get_user_email()
         }
-        response = requests.get(self._giveaway_catalog_url, headers=self._headers, params=params)
-        response_json = response.json()
+        response_json = self._get_json(self._giveaway_catalog_url, params=params)
         games = []
         for data in response_json['data']:
             existing_game_names = [g['game_name'] for g in games] if games else []
@@ -145,22 +206,18 @@ class Heirloom(object):
     def download_game(self, game_name, output_dir=None):
         if not output_dir:
             output_dir = self._tmp_dir
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}')
+        game = self._find_game(game_name)
         if game['amazonprime_giveaway']:
             params = {
                 'installerUuid': game['installer_uuid']
             }
-            response = requests.get(self._giveaway_download_url, headers=self._headers, params=params)
+            response_json = self._get_json(self._giveaway_download_url, params=params)
         else:
             product_catalog = self.get_product_catalog()
             params = {
                 'userId': self._user_id
             }
-            response = requests.get(self._purchased_games_url, headers=self._headers, params=params)
-            data = response.json().get('data')
+            data = self._get_json(self._purchased_games_url, params=params).get('data')
             if data:
                 purchased_games = [p for p in product_catalog if 'product_id' in p and p['product_id'] in [d['product_id'] for d in data]]
             else:
@@ -173,103 +230,97 @@ class Heirloom(object):
                 'productId': product['product_id'],
                 'gameId': game['game_id']
             }
-            response = requests.get(self._purchase_download_url, headers=self._headers, params=params)
-        response_json = response.json()
+            response_json = self._get_json(self._purchase_download_url, params=params)
         if not response_json.get('data') or type(response_json.get('data')) != dict:
             raise AssertionError(f'Got invalid data back from download request!\n{response_json.get("data")}\nParams:\n{params}')
         cdn_url = response_json['data']['file']
-        response = requests.get(cdn_url, stream=True)
-        total_size = int(response.headers.get("content-length", 0))
-        block_size = 1024  # chunk size in bytes
-        if not os.path.isdir(output_dir):
-            os.makedirs(output_dir)
-        with open(output_dir + cdn_url.split('/')[-1], 'wb') as f:
-            if not self._quiet:
-                with Progress() as progress_bar:
-                    download_task = progress_bar.add_task(f'[green]Downloading[/green] [white italic]{game_name}[/white italic] ([yellow]{game["game_installed_size"]}[/yellow])', total=total_size)
-                    for data in response.iter_content(block_size):
-                        progress_bar.update(download_task, advance=len(data))
-                        f.write(data)
-            else:
-                for data in response.iter_content(block_size):
-                    f.write(data)
-        return cdn_url.split('/')[-1]
+        return self._download_file(
+            cdn_url,
+            output_dir,
+            f'[green]Downloading[/green] [white italic]{game_name}[/white italic] ([yellow]{game["game_installed_size"]}[/yellow])',
+        )
 
 
     def download_artwork(self, game_name, output_dir=None):
         if not output_dir:
             output_dir = self._tmp_dir
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}"')
+        game = self._find_game(game_name)
         coverart_url = game['game_coverart']
-        response = requests.get(coverart_url, headers=self._headers, stream=True)
-        total_size = int(response.headers.get("content-length", 0))
-        block_size = 1024  # chunk size in bytes
-        if not os.path.isdir(output_dir):
-            os.makedirs(output_dir)
-        with open(output_dir + coverart_url.split('/')[-1], 'wb') as f:
-            with Progress() as progress_bar:
-                download_task = progress_bar.add_task(f'[yellow]Downloading artwork for[/yellow] [white]{game_name}[/white]', total=total_size)
-                for data in response.iter_content(block_size):
-                    progress_bar.update(download_task, advance=len(data))
-                    f.write(data)
-        return coverart_url.split('/')[-1]
+        return self._download_file(
+            coverart_url,
+            output_dir,
+            f'[yellow]Downloading artwork for[/yellow] [white]{game_name}[/white]',
+        )
 
 
     def install_game(self, game_name, installation_method=None, show_gui=False):
-        cmd = None
         if not installation_method:
             installation_method = self._default_installation_method
         if installation_method.lower() not in ('wine', '7zip'):
             raise AssertionError(f'Invalid installation method ("{installation_method}"); valid installation methods are: ["wine", "7zip"]')
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}')
+        game = self._find_game(game_name)
         fn = self.download_game(game_name)
-        folder_name = '_'.join(fn.split('_')[:-1])
+        folder_name = self._install_folder_name(fn)
+        unix_install_path = self._base_install_dir / folder_name
+        wine_install_path = self._wine_install_path(folder_name)
+        installer_path = self._tmp_dir / fn
         if installation_method.lower() == 'wine':
             if not self._wine_path or not os.path.exists(self._wine_path):
                 raise AssertionError(f'wine executable not found!')
             if not show_gui:
-                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, '/S', f'/D={self._base_install_wine_path}{folder_name}']
+                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', str(installer_path), '/S', f'/D={wine_install_path}']
             else:
-                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', self._tmp_dir + fn, f'/D={self._base_install_wine_path}{folder_name}']
+                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', str(installer_path), f'/D={wine_install_path}']
         elif installation_method.lower() == '7zip':
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')
-            cmd = [self._7zip_path, 'x', f'-o{self._base_install_dir}{folder_name}', '-y', self._tmp_dir + fn]
+            cmd = [self._7zip_path, 'x', f'-o{unix_install_path}', '-y', str(installer_path)]
+        self._base_install_dir.mkdir(parents=True, exist_ok=True)
+
         if not self._quiet:
             console = Console()
             console.print(f'[green]Installation method[/green] is [blue bold]{installation_method}[/blue bold]')
             with console.status(f'Running command: [yellow]{" ".join(cmd)}[/yellow]'):
                 result = subprocess.run(cmd, timeout=300, capture_output=True)
-                if os.path.isdir(self._base_install_dir + folder_name):
-                    install_dir = Path(self._base_install_dir + folder_name)
-                    executable_files = [g.as_posix() for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
-                    return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
-                else:
-                    return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
         else:
-                result = subprocess.run(cmd, timeout=300, capture_output=True)
-                if os.path.isdir(self._base_install_dir + folder_name):
-                    install_dir = Path(self._base_install_dir + folder_name)
-                    executable_files = [g.as_posix() for g in install_dir.glob('**/*.exe') if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()]
-                    return {'status': 'success', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'executable_files': executable_files, 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
-                else:
-                    return {'status': 'fail', 'cmd': cmd, 'stdout': result.stdout.decode('utf-8'), 'stderr': result.stderr.decode('utf-8'), 'install_path': f'{self._base_install_wine_path}{folder_name}', 'game': game['game_name'], 'uuid': game['installer_uuid']}
+            result = subprocess.run(cmd, timeout=300, capture_output=True)
+
+        installed = unix_install_path.is_dir()
+        install_dir = unix_install_path
+        response = {
+            'status': 'success' if installed else 'fail',
+            'cmd': cmd,
+            'stdout': result.stdout.decode('utf-8', errors='replace'),
+            'stderr': result.stderr.decode('utf-8', errors='replace'),
+            'install_path': wine_install_path,
+            'unix_install_path': install_dir.as_posix(),
+            'game': game['game_name'],
+            'uuid': game['installer_uuid'],
+        }
+        if installed:
+            response['executable_files'] = [
+                g.as_posix()
+                for g in install_dir.glob('**/*.exe')
+                if 'uninstall' not in g.name.lower() and 'crashhandler' not in g.name.lower()
+            ]
+        return response
 
 
     def uninstall_game(self, game_name, install_dir):
-        try:
-            game = next((g for g in self.games if g['game_name'].lower() == game_name.lower()))
-        except StopIteration:
-            raise AssertionError(f'Unable to find game with name "{game_name}"')
+        game = self._find_game(game_name)
+        target_dir = self._ensure_install_dir_is_safe(install_dir)
         if not self._quiet:
             console = Console()
             with console.status(f'[green]Uninstalling[/green] [white italic]{game_name}[/white italic]'):
-                pass # do delete
+                if target_dir.exists():
+                    shutil.rmtree(target_dir)
         else:
-            pass # do delete silently
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+        return {
+            'status': 'success',
+            'install_path': str(install_dir),
+            'unix_install_path': target_dir.as_posix(),
+            'game': game['game_name'],
+            'uuid': game['installer_uuid'],
+        }
