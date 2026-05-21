@@ -31,6 +31,7 @@ ApplicationWindow {
         padding: 10
         leftPadding: 16
         rightPadding: 16
+        Layout.minimumWidth: 0
         implicitHeight: 40
         font.pixelSize: 14
         font.weight: Font.DemiBold
@@ -47,6 +48,70 @@ ApplicationWindow {
             color: control.hovered ? control.fillHover : control.fill
             border.color: control.stroke
             border.width: 1
+        }
+    }
+
+    component HeirloomLoader: Item {
+        id: loader
+        implicitWidth: 104
+        implicitHeight: 104
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 86
+            height: 86
+            radius: 43
+            color: "#111820"
+            border.color: "#2b5f52"
+            border.width: 1
+        }
+
+        Repeater {
+            model: 10
+            Rectangle {
+                width: 9
+                height: 9
+                radius: 4.5
+                color: index % 2 === 0 ? root.accent : root.amber
+                opacity: 0.28 + index * 0.065
+                x: loader.width / 2 + Math.cos((index / 10) * Math.PI * 2) * 43 - width / 2
+                y: loader.height / 2 + Math.sin((index / 10) * Math.PI * 2) * 43 - height / 2
+            }
+        }
+
+        Image {
+            id: loaderLogo
+            anchors.centerIn: parent
+            width: 54
+            height: 54
+            source: logoPath
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+
+        NumberAnimation on rotation {
+            from: 0
+            to: 360
+            duration: 1500
+            loops: Animation.Infinite
+            easing.type: Easing.InOutQuad
+        }
+
+        NumberAnimation {
+            target: loader
+            property: "opacity"
+            from: 0.72
+            to: 1.0
+            duration: 800
+            loops: Animation.Infinite
+            easing.type: Easing.InOutSine
+        }
+
+        SequentialAnimation {
+            running: true
+            loops: Animation.Infinite
+            NumberAnimation { target: loaderLogo; property: "scale"; from: 0.92; to: 1.04; duration: 760; easing.type: Easing.InOutSine }
+            NumberAnimation { target: loaderLogo; property: "scale"; from: 1.04; to: 0.92; duration: 760; easing.type: Easing.InOutSine }
         }
     }
 
@@ -330,16 +395,17 @@ ApplicationWindow {
                     anchors.margins: 22
                     model: gamesModel
                     clip: true
-                    cellWidth: Math.max(300, Math.floor(width / Math.max(1, Math.floor(width / 330))))
-                    cellHeight: 394
+                    cellWidth: Math.max(336, Math.floor(width / Math.max(1, Math.floor(width / 356))))
+                    cellHeight: 406
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { }
 
                     delegate: Rectangle {
                         id: card
                         width: grid.cellWidth - 14
-                        height: 374
+                        height: 386
                         radius: 8
+                        clip: true
                         color: hover.hovered ? "#222933" : root.panel
                         border.color: installed ? "#2f6b5d" : root.line
                         border.width: 1
@@ -353,15 +419,16 @@ ApplicationWindow {
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 164
+                                Layout.preferredHeight: 156
                                 radius: 7
                                 color: "#0d1116"
                                 clip: true
 
                                 Image {
                                     anchors.fill: parent
+                                    anchors.margins: 8
                                     source: coverArt
-                                    fillMode: Image.PreserveAspectCrop
+                                    fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
                                 }
@@ -432,10 +499,12 @@ ApplicationWindow {
 
                             RowLayout {
                                 Layout.fillWidth: true
+                                Layout.preferredHeight: 40
                                 spacing: 8
 
                                 HButton {
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     text: installed ? "Launch" : "Install"
                                     enabled: !controller.busy
                                     fill: installed ? "#15221f" : "#1c2028"
@@ -446,7 +515,8 @@ ApplicationWindow {
                                 }
 
                                 HButton {
-                                    Layout.preferredWidth: 104
+                                    Layout.preferredWidth: 96
+                                    Layout.minimumWidth: 88
                                     text: "Uninstall"
                                     visible: installed
                                     enabled: !controller.busy
@@ -480,7 +550,7 @@ ApplicationWindow {
         Rectangle {
             anchors.centerIn: parent
             width: 360
-            height: 132
+            height: 188
             radius: 8
             color: root.panelRaised
             border.color: root.line
@@ -491,9 +561,8 @@ ApplicationWindow {
                 anchors.margins: 22
                 spacing: 14
 
-                BusyIndicator {
+                HeirloomLoader {
                     Layout.alignment: Qt.AlignHCenter
-                    running: controller.busy
                 }
 
                 Text {
@@ -554,6 +623,7 @@ ApplicationWindow {
                 TextField {
                     id: userInput
                     Layout.fillWidth: true
+                    text: controller.configUser
                     placeholderText: "you@example.com"
                 }
 
@@ -562,14 +632,14 @@ ApplicationWindow {
                     id: passwordInput
                     Layout.fillWidth: true
                     echoMode: TextInput.Password
-                    placeholderText: "Password"
+                    placeholderText: controller.configured ? "Saved password will be kept" : "Password"
                 }
 
                 FieldLabel { text: "Base install directory" }
                 TextField {
                     id: installDirInput
                     Layout.fillWidth: true
-                    text: "~/Games/LegacyGames/"
+                    text: controller.configBaseInstallDir
                 }
 
                 RowLayout {
@@ -583,6 +653,7 @@ ApplicationWindow {
                         TextField {
                             id: wineInput
                             Layout.fillWidth: true
+                            text: controller.configWinePath
                             placeholderText: "wine"
                         }
                     }
@@ -594,6 +665,7 @@ ApplicationWindow {
                         TextField {
                             id: sevenZipInput
                             Layout.fillWidth: true
+                            text: controller.configSevenZipPath
                             placeholderText: "7z"
                         }
                     }
@@ -604,6 +676,7 @@ ApplicationWindow {
                     id: installMethodInput
                     Layout.fillWidth: true
                     model: ["7zip", "wine"]
+                    Component.onCompleted: currentIndex = controller.configDefaultInstallationMethod === "wine" ? 1 : 0
                 }
 
                 Item { Layout.fillHeight: true }
@@ -646,7 +719,7 @@ ApplicationWindow {
                                 sevenZipInput.text,
                                 installMethodInput.currentText
                             )
-                            if (userInput.text.length > 0 && passwordInput.text.length > 0)
+                            if (userInput.text.length > 0 && (passwordInput.text.length > 0 || controller.configured))
                                 root.settingsOpen = false
                         }
                     }

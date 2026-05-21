@@ -1,4 +1,3 @@
-import base64
 import os
 import shutil
 import subprocess
@@ -156,9 +155,15 @@ class GuiController(QObject):
         self._status_message = 'Ready'
         self._error_message = ''
         self._config = {}
+        self._config_user = ''
+        self._config_base_install_dir = str(Path('~/Games/LegacyGames/').expanduser())
+        self._config_wine_path = shutil.which('wine') or ''
+        self._config_sevenzip_path = shutil.which('7z') or ''
+        self._config_default_installation_method = '7zip'
         self._db = None
         self._heirloom = None
 
+        self._load_public_settings()
         self._gamesLoaded.connect(self._apply_games)
         self._operationFailed.connect(self._fail_operation)
         self._operationStatus.connect(self._set_status)
@@ -204,6 +209,31 @@ class GuiController(QObject):
 
     errorMessage = Property(str, _get_error_message, notify=errorMessageChanged)
 
+    def _get_config_user(self):
+        return self._config_user
+
+    configUser = Property(str, _get_config_user, notify=settingsChanged)
+
+    def _get_config_base_install_dir(self):
+        return self._config_base_install_dir
+
+    configBaseInstallDir = Property(str, _get_config_base_install_dir, notify=settingsChanged)
+
+    def _get_config_wine_path(self):
+        return self._config_wine_path
+
+    configWinePath = Property(str, _get_config_wine_path, notify=settingsChanged)
+
+    def _get_config_sevenzip_path(self):
+        return self._config_sevenzip_path
+
+    configSevenZipPath = Property(str, _get_config_sevenzip_path, notify=settingsChanged)
+
+    def _get_config_default_installation_method(self):
+        return self._config_default_installation_method
+
+    configDefaultInstallationMethod = Property(str, _get_config_default_installation_method, notify=settingsChanged)
+
     @Slot()
     def bootstrap(self):
         if not CONFIG_FILE.is_file():
@@ -222,8 +252,12 @@ class GuiController(QObject):
 
     @Slot(str, str, str, str, str, str)
     def saveConfiguration(self, user, password, base_install_dir, wine_path, sevenzip_path, install_method):
-        if not user.strip() or not password:
-            self._set_error('Username and password are required.')
+        if not user.strip():
+            self._set_error('Username is required.')
+            return
+        existing_password = self._read_saved_password_token()
+        if not password and not existing_password:
+            self._set_error('Password is required.')
             return
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         if not get_encryption_key():
@@ -232,7 +266,10 @@ class GuiController(QObject):
         parser = ConfigParser()
         parser.add_section('HeirloomGM')
         parser.set('HeirloomGM', 'user', user.strip())
-        parser.set('HeirloomGM', 'password', encrypt_password(password).decode('utf-8'))
+        if password:
+            parser.set('HeirloomGM', 'password', encrypt_password(password).decode('utf-8'))
+        else:
+            parser.set('HeirloomGM', 'password', existing_password)
         parser.set('HeirloomGM', 'base_install_dir', base_install_dir.strip() or str(Path('~/Games/LegacyGames/').expanduser()))
         parser.set('HeirloomGM', 'wine_path', wine_path.strip() or shutil.which('wine') or '')
         parser.set('HeirloomGM', '7zip_path', sevenzip_path.strip() or shutil.which('7z') or '')
@@ -241,6 +278,8 @@ class GuiController(QObject):
             parser.write(config_file)
         CONFIG_FILE.chmod(0o600)
         self._set_configured(True)
+        self._heirloom = None
+        self._load_public_settings()
         self._set_error('')
         self._set_status('Configuration saved')
         self.refreshLibrary()
@@ -300,6 +339,32 @@ class GuiController(QObject):
     def _run(self, target):
         thread = threading.Thread(target=target, daemon=True)
         thread.start()
+
+    def _read_saved_password_token(self):
+        if not CONFIG_FILE.is_file():
+            return ''
+        parser = ConfigParser()
+        parser.read(CONFIG_FILE)
+        if not parser.has_section('HeirloomGM'):
+            return ''
+        return parser.get('HeirloomGM', 'password', fallback='')
+
+    def _load_public_settings(self):
+        if not CONFIG_FILE.is_file():
+            self.settingsChanged.emit()
+            return
+        parser = ConfigParser()
+        parser.read(CONFIG_FILE)
+        if not parser.has_section('HeirloomGM'):
+            self.settingsChanged.emit()
+            return
+        section = parser['HeirloomGM']
+        self._config_user = section.get('user', self._config_user)
+        self._config_base_install_dir = section.get('base_install_dir', self._config_base_install_dir)
+        self._config_wine_path = section.get('wine_path', self._config_wine_path)
+        self._config_sevenzip_path = section.get('7zip_path', self._config_sevenzip_path)
+        self._config_default_installation_method = section.get('default_installation_method', self._config_default_installation_method)
+        self.settingsChanged.emit()
 
     def _load_config(self):
         config_parser = get_config(str(CONFIG_DIR) + os.sep)
