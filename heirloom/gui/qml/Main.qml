@@ -396,14 +396,14 @@ ApplicationWindow {
                     model: gamesModel
                     clip: true
                     cellWidth: Math.max(336, Math.floor(width / Math.max(1, Math.floor(width / 356))))
-                    cellHeight: 406
+                    cellHeight: 462
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { }
 
                     delegate: Rectangle {
                         id: card
                         width: grid.cellWidth - 14
-                        height: 386
+                        height: 442
                         radius: 8
                         clip: true
                         color: hover.hovered ? "#222933" : root.panel
@@ -418,8 +418,9 @@ ApplicationWindow {
                             spacing: 10
 
                             Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: width
+                                Layout.preferredWidth: Math.min(card.width - 24, 196)
+                                Layout.preferredHeight: Math.min(card.width - 24, 196)
+                                Layout.alignment: Qt.AlignHCenter
                                 radius: 7
                                 color: "#0d1116"
                                 clip: true
