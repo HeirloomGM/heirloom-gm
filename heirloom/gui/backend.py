@@ -140,10 +140,12 @@ class GuiController(QObject):
     statusMessageChanged = Signal()
     errorMessageChanged = Signal()
     settingsChanged = Signal()
+    progressChanged = Signal()
     operationFinished = Signal()
     _gamesLoaded = Signal(list)
     _operationFailed = Signal(str)
     _operationStatus = Signal(str)
+    _operationProgress = Signal(float, str)
     _operationDone = Signal()
 
     def __init__(self):
@@ -160,12 +162,15 @@ class GuiController(QObject):
         self._config_wine_path = shutil.which('wine') or ''
         self._config_sevenzip_path = shutil.which('7z') or ''
         self._config_default_installation_method = '7zip'
+        self._progress = -1.0
+        self._progress_label = ''
         self._heirloom = None
 
         self._load_public_settings()
         self._gamesLoaded.connect(self._apply_games)
         self._operationFailed.connect(self._fail_operation)
         self._operationStatus.connect(self._set_status)
+        self._operationProgress.connect(self._set_progress)
         self._operationDone.connect(self._finish_operation)
 
     def _get_busy(self):
@@ -233,6 +238,23 @@ class GuiController(QObject):
 
     configDefaultInstallationMethod = Property(str, _get_config_default_installation_method, notify=settingsChanged)
 
+    def _get_progress(self):
+        return self._progress
+
+    progress = Property(float, _get_progress, notify=progressChanged)
+
+    def _get_progress_label(self):
+        return self._progress_label
+
+    progressLabel = Property(str, _get_progress_label, notify=progressChanged)
+
+    def _set_progress(self, value, label=''):
+        value = max(-1.0, min(1.0, value))
+        if self._progress != value or self._progress_label != label:
+            self._progress = value
+            self._progress_label = label
+            self.progressChanged.emit()
+
     @Slot()
     def bootstrap(self):
         if not CONFIG_FILE.is_file():
@@ -289,6 +311,7 @@ class GuiController(QObject):
             return
         self._set_busy(True)
         self._set_error('')
+        self._set_progress(-1.0, '')
         self._set_status('Refreshing Legacy Games library...')
         self._run(self._refresh_library_worker)
 
@@ -302,6 +325,7 @@ class GuiController(QObject):
             return
         self._set_busy(True)
         self._set_error('')
+        self._set_progress(-1.0, '')
         self._set_status(f'Installing {game["game_name"]}...')
         self._run(lambda: self._install_worker(uuid))
 
@@ -315,6 +339,7 @@ class GuiController(QObject):
             return
         self._set_busy(True)
         self._set_error('')
+        self._set_progress(-1.0, '')
         self._set_status(f'Uninstalling {game["game_name"]}...')
         self._run(lambda: self._uninstall_worker(uuid))
 
@@ -402,7 +427,7 @@ class GuiController(QObject):
         try:
             heirloom = self._ensure_client()
             game = next(game for game in heirloom.games if game.get('installer_uuid') == uuid)
-            result = heirloom.install_game(game['game_name'])
+            result = heirloom.install_game(game['game_name'], progress_callback=self._download_progress_callback(game['game_name']))
             if result.get('status') != 'success':
                 raise RuntimeError(result.get('stderr') or 'Installation failed.')
             executable = self._select_executable(result.get('executable_files') or [], result['install_path'])
@@ -439,6 +464,18 @@ class GuiController(QObject):
             self._refresh_library_worker()
         except Exception as exc:
             self._operationFailed.emit(str(exc))
+
+    def _download_progress_callback(self, game_name):
+        def callback(downloaded, total):
+            if total:
+                value = downloaded / total
+                label = f'{downloaded / (1024 * 1024):.1f} MB of {total / (1024 * 1024):.1f} MB'
+            else:
+                value = -1.0
+                label = f'{downloaded / (1024 * 1024):.1f} MB downloaded'
+            self._operationStatus.emit(f'Downloading {game_name}...')
+            self._operationProgress.emit(value, label)
+        return callback
 
     def _merge_database_records(self, db, games):
         merged = []
@@ -487,11 +524,13 @@ class GuiController(QObject):
 
     def _finish_operation(self):
         self._set_busy(False)
+        self._set_progress(-1.0, '')
         self._set_status(self._status_message if self._status_message else 'Ready')
         self.operationFinished.emit()
 
     def _fail_operation(self, message):
         self._set_busy(False)
+        self._set_progress(-1.0, '')
         self._set_error(message)
         self._set_status('Something went wrong')
         self.operationFinished.emit()

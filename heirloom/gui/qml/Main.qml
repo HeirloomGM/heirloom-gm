@@ -549,8 +549,8 @@ ApplicationWindow {
 
         Rectangle {
             anchors.centerIn: parent
-            width: 360
-            height: 188
+            width: 390
+            height: controller.progress >= 0 ? 236 : 188
             radius: 8
             color: root.panelRaised
             border.color: root.line
@@ -572,6 +572,40 @@ ApplicationWindow {
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     font.pixelSize: 14
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 7
+                    visible: controller.progress >= 0
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 10
+                        radius: 5
+                        color: "#10151b"
+                        border.color: root.line
+                        border.width: 1
+                        clip: true
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: Math.max(8, parent.width * controller.progress)
+                            radius: 5
+                            color: root.accent
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: Math.round(controller.progress * 100) + "%  " + controller.progressLabel
+                        color: root.muted
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        font.pixelSize: 12
+                    }
                 }
             }
         }

@@ -54,7 +54,7 @@ class Heirloom(object):
         return response.json()
 
 
-    def _download_file(self, url, output_dir, description):
+    def _download_file(self, url, output_dir, description, progress_callback=None):
         output_path = Path(output_dir).expanduser()
         output_path.mkdir(parents=True, exist_ok=True)
         filename = unquote(Path(urlparse(url).path).name)
@@ -65,18 +65,25 @@ class Heirloom(object):
         response.raise_for_status()
         total_size = int(response.headers.get('content-length', 0))
         block_size = 1024 * 128
+        downloaded = 0
         with destination.open('wb') as f:
             if not self._quiet:
                 with Progress() as progress_bar:
                     download_task = progress_bar.add_task(description, total=total_size)
                     for data in response.iter_content(block_size):
                         if data:
+                            downloaded += len(data)
                             progress_bar.update(download_task, advance=len(data))
                             f.write(data)
+                            if progress_callback:
+                                progress_callback(downloaded, total_size)
             else:
                 for data in response.iter_content(block_size):
                     if data:
+                        downloaded += len(data)
                         f.write(data)
+                        if progress_callback:
+                            progress_callback(downloaded, total_size)
         return filename
 
 
@@ -203,7 +210,7 @@ class Heirloom(object):
         self.games = purchased_games + [g for g in giveaway_games if g['game_name'] not in [p['game_name'] for p in purchased_games]]
 
 
-    def download_game(self, game_name, output_dir=None):
+    def download_game(self, game_name, output_dir=None, progress_callback=None):
         if not output_dir:
             output_dir = self._tmp_dir
         game = self._find_game(game_name)
@@ -238,6 +245,7 @@ class Heirloom(object):
             cdn_url,
             output_dir,
             f'[green]Downloading[/green] [white italic]{game_name}[/white italic] ([yellow]{game["game_installed_size"]}[/yellow])',
+            progress_callback=progress_callback,
         )
 
 
@@ -253,13 +261,13 @@ class Heirloom(object):
         )
 
 
-    def install_game(self, game_name, installation_method=None, show_gui=False):
+    def install_game(self, game_name, installation_method=None, show_gui=False, progress_callback=None):
         if not installation_method:
             installation_method = self._default_installation_method
         if installation_method.lower() not in ('wine', '7zip'):
             raise AssertionError(f'Invalid installation method ("{installation_method}"); valid installation methods are: ["wine", "7zip"]')
         game = self._find_game(game_name)
-        fn = self.download_game(game_name)
+        fn = self.download_game(game_name, progress_callback=progress_callback)
         folder_name = self._install_folder_name(fn)
         unix_install_path = self._base_install_dir / folder_name
         wine_install_path = self._wine_install_path(folder_name)
