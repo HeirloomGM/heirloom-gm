@@ -419,16 +419,15 @@ ApplicationWindow {
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 156
+                                Layout.preferredHeight: width
                                 radius: 7
                                 color: "#0d1116"
                                 clip: true
 
                                 Image {
                                     anchors.fill: parent
-                                    anchors.margins: 8
                                     source: coverArt
-                                    fillMode: Image.PreserveAspectFit
+                                    fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     smooth: true
                                 }
