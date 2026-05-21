@@ -139,6 +139,20 @@ Passwords are encrypted before being written to the config file. The encryption 
 
 Do not commit local config files or credentials. Seriously. Future you deserves peace.
 
+To throw away the saved configuration and enter credentials/settings again:
+
+```bash
+heirloom-gm --reconfigure
+```
+
+The GUI supports the same reset flow:
+
+```bash
+heirloom-gui --reconfigure
+```
+
+Reconfiguration removes `~/.config/heirloom/config.ini`. It does not remove `~/.config/heirloom/games.db`, so your local installed-game records are preserved.
+
 ## CLI Usage
 
 ### List Games

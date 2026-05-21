@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 from enum import Enum
+from pathlib import Path
 
 import rich
 import typer
@@ -19,6 +20,7 @@ console = rich.console.Console()
 app = typer.Typer(rich_markup_mode='rich')
 
 config_dir = os.path.expanduser('~/.config/heirloom/')
+config_file = Path(config_dir).expanduser() / 'config.ini'
 config = None
 heirloom = None
 
@@ -26,6 +28,47 @@ heirloom = None
 class InstallationMethod(str, Enum):
     wine = 'wine'
     sevenzip = '7zip'
+
+
+def reset_runtime_context():
+    global config, heirloom
+    if config and config.get('db'):
+        config['db'].close()
+    config = None
+    heirloom = None
+
+
+def reset_configuration():
+    reset_runtime_context()
+    if config_file.is_file():
+        config_file.unlink()
+        console.print(f'Removed configuration file: [yellow]{config_file}[/yellow]')
+    else:
+        console.print(f'No configuration file found at [yellow]{config_file}[/yellow].')
+
+
+@app.callback(invoke_without_command=True)
+def configure_app(
+    ctx: typer.Context,
+    reconfigure: Annotated[
+        bool,
+        typer.Option(
+            '--reconfigure',
+            help='Delete the saved configuration and prompt for Legacy Games credentials and install settings.',
+        ),
+    ] = False,
+):
+    """
+    Manage Legacy Games from Linux.
+    """
+    if not reconfigure:
+        return
+
+    reset_configuration()
+    get_context(refresh=False)
+    console.print('[green]Configuration updated successfully.[/green]')
+    if ctx.invoked_subcommand is None:
+        raise typer.Exit()
 
 
 def get_context(refresh=True):

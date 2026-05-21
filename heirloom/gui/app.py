@@ -6,16 +6,21 @@ from PySide6.QtCore import QCoreApplication, QUrl
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 
-from .backend import GuiController
+from .backend import CONFIG_FILE, GuiController
 
 
 def main():
     os.environ.setdefault('QSG_RHI_BACKEND', 'opengl')
+    reconfigure = '--reconfigure' in sys.argv
+    qt_argv = [arg for arg in sys.argv if arg != '--reconfigure']
 
     QCoreApplication.setApplicationName('Heirloom Games Manager')
     QCoreApplication.setOrganizationName('HeirloomGM')
 
-    app = QGuiApplication(sys.argv)
+    if reconfigure and CONFIG_FILE.is_file():
+        CONFIG_FILE.unlink()
+
+    app = QGuiApplication(qt_argv)
     controller = GuiController()
 
     logo_path = resources.files('heirloom.gui') / 'assets' / 'heirloom.png'
