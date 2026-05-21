@@ -11,9 +11,14 @@ dependencies = [
     "rich",
     "InquirerPy",
     "keyring",
-    "cryptography"
+    "cryptography",
+    "PySide6"
 ]
 requires-python = ">= 3.10"
 
 [project.scripts]
 heirloom-gm = "heirloom.cli:main"
+heirloom-gui = "heirloom.gui:main"
+
+[tool.setuptools.package-data]
+"heirloom.gui" = ["qml/*.qml", "assets/*.png"]

@@ -2,7 +2,6 @@ import os
 import shutil
 from pathlib import Path
 from rich.console import Console
-from InquirerPy import inquirer
 from configparser import ConfigParser
 
 from ..password_functions import *
@@ -16,6 +15,10 @@ def get_config(config_dir):
     config_parser = ConfigParser()
     config_parser.add_section('HeirloomGM')
     if not config_file.is_file() or config_file.stat().st_size == 0:
+        try:
+            from InquirerPy import inquirer
+        except ModuleNotFoundError as exc:
+            raise RuntimeError('Configuration is missing and interactive CLI prompts are unavailable.') from exc
         console.print(f'Configuration file not found: [yellow]{config_file}[/yellow]')
         console.print('Please enter your login credentials for Legacy Games.')
         config_parser.set('HeirloomGM', 'user', inquirer.text('Enter username or email: ').execute())

@@ -18,7 +18,7 @@
 
 Heirloom Games Manager is a small but increasingly serious tool for accessing your Legacy Games library on Linux. Legacy Games does not currently provide a Linux version of its installation manager, which is a little awkward if you are trying to enjoy those games on a Steam Deck, a living room Linux box, or just a regular desktop where you would rather not boot Windows for one installer.
 
-Heirloom fills that gap. It can log in to Legacy Games, list your library, download installers, install games through Wine or 7-Zip extraction, keep track of what is installed, launch installed games, and uninstall games it manages.
+Heirloom fills that gap. It can log in to Legacy Games, list your library, download installers, install games through Wine or 7-Zip extraction, keep track of what is installed, launch installed games, and uninstall games it manages. You can use it as a CLI, import it as a Python library, or run the Qt 6 QML interface.
 
 It is inspired by projects like [legendary](https://github.com/derrod/legendary) for Epic Games and [nile](https://github.com/imLinguin/nile) for Amazon Games. Legacy -> Heirloom. The joke was right there. I had to.
 
@@ -45,8 +45,9 @@ So I made Heirloom. It started as a rough command line helper, and it is gradual
 - Encrypt stored passwords using a locally generated key.
 - Fall back gracefully when a desktop keyring backend is not available.
 - Provide a Python library API for other tools and frontends.
+- Provide a Qt 6 QML desktop interface via `heirloom-gui`.
 
-There is also an unfinished Qt-based graphical interface in progress. The CLI and library are the priority right now because they are the foundation the GUI should stand on.
+The GUI is intentionally built on the same library and local database as the CLI. That keeps the pretty part honest.
 
 ## Recent Improvements
 
@@ -61,6 +62,9 @@ Heirloom has been getting some much-needed grown-up plumbing:
 - Uninstall resets install state instead of deleting the game record from the local catalog.
 - Password handling supports the original keyring entry, a newer keyring entry, and a local encrypted-key fallback for Linux systems without a working keyring.
 - Encrypted passwords that cannot be decrypted now fail with a clear local error instead of being sent to Legacy Games and producing a confusing server error.
+- The old experimental GUI work has been replaced with a PySide6/QML application shell.
+- GUI library loading, installation, and uninstall operations run off the UI thread.
+- The GUI now has a setup flow, artwork cache, search, installed/not-installed filters, responsive cards, and launch/install/uninstall actions.
 - Focused unit tests now cover path conversion, install-state database behavior, quoted game names, and CLI import behavior.
 
 ## Requirements
@@ -76,6 +80,7 @@ rich
 InquirerPy
 cryptography
 keyring
+PySide6
 ```
 
 For installing and launching games, you will also want:
@@ -99,6 +104,12 @@ This installs the CLI as:
 
 ```bash
 heirloom-gm
+```
+
+And the Qt GUI as:
+
+```bash
+heirloom-gui
 ```
 
 ## Configuration
@@ -210,6 +221,26 @@ heirloom-gm uninstall --game "The Wild Case" --yes
 
 Heirloom only removes install directories under the configured base install directory. That guardrail is intentional.
 
+## GUI Usage
+
+Launch the Qt interface with:
+
+```bash
+heirloom-gui
+```
+
+The GUI can:
+
+- Prompt for initial Legacy Games configuration.
+- Refresh and display your game library.
+- Cache cover artwork locally.
+- Search and filter by install status.
+- Install games.
+- Launch games with recorded executables.
+- Uninstall managed games.
+
+It is a Qt 6 QML app using PySide6. It is designed to feel at home on desktop Linux and Steam Deck rather than like a quick wrapper around terminal output.
+
 ## Library Usage
 
 Heirloom can also be imported and used from Python:
@@ -251,7 +282,7 @@ The current focus is:
 
 - Make install and uninstall behavior boringly reliable.
 - Improve installed-game metadata and launch handling.
-- Keep the CLI stable enough that it can become the backend for the Qt GUI.
+- Keep the CLI and Qt GUI backed by the same stable library behavior.
 - Make the whole thing feel good on Steam Deck.
 
 ## Name
@@ -261,4 +292,3 @@ Why "Heirloom"?
 Because [legendary](https://github.com/derrod/legendary) handles Epic, [nile](https://github.com/imLinguin/nile) handles Amazon, and this handles Legacy.
 
 Legacy. Heirloom. You get it.
-
