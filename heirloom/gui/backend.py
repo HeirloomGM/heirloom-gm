@@ -160,7 +160,6 @@ class GuiController(QObject):
         self._config_wine_path = shutil.which('wine') or ''
         self._config_sevenzip_path = shutil.which('7z') or ''
         self._config_default_installation_method = '7zip'
-        self._db = None
         self._heirloom = None
 
         self._load_public_settings()
@@ -325,7 +324,11 @@ class GuiController(QObject):
         if not game:
             self._set_error('Game not found.')
             return
-        record = read_game_record(self._db, uuid=uuid) if self._db else None
+        db = init_games_db(str(CONFIG_DIR), [])
+        try:
+            record = read_game_record(db, uuid=uuid)
+        finally:
+            db.close()
         if not record or record['executable'] == NOT_INSTALLED:
             self._set_error(f'{game["game_name"]} does not have a launch executable recorded.')
             return
@@ -383,9 +386,12 @@ class GuiController(QObject):
             heirloom.login()
             self._operationStatus.emit('Loading library...')
             heirloom.refresh_games_list()
-            self._db = init_games_db(str(CONFIG_DIR), heirloom.games)
-            refresh_game_installation_status(self._db)
-            games = self._merge_database_records(heirloom.games)
+            db = init_games_db(str(CONFIG_DIR), heirloom.games)
+            try:
+                refresh_game_installation_status(db)
+                games = self._merge_database_records(db, heirloom.games)
+            finally:
+                db.close()
             self._operationStatus.emit('Preparing artwork...')
             self._cache_artwork(games)
             self._gamesLoaded.emit(games)
@@ -400,13 +406,17 @@ class GuiController(QObject):
             if result.get('status') != 'success':
                 raise RuntimeError(result.get('stderr') or 'Installation failed.')
             executable = self._select_executable(result.get('executable_files') or [], result['install_path'])
-            write_game_record(
-                self._db,
-                name=result['game'],
-                uuid=result['uuid'],
-                install_dir=result['install_path'],
-                executable=executable,
-            )
+            db = init_games_db(str(CONFIG_DIR), heirloom.games)
+            try:
+                write_game_record(
+                    db,
+                    name=result['game'],
+                    uuid=result['uuid'],
+                    install_dir=result['install_path'],
+                    executable=executable,
+                )
+            finally:
+                db.close()
             self._operationStatus.emit(f'Installed {result["game"]}.')
             self._refresh_library_worker()
         except Exception as exc:
@@ -416,22 +426,26 @@ class GuiController(QObject):
         try:
             heirloom = self._ensure_client()
             game = next(game for game in heirloom.games if game.get('installer_uuid') == uuid)
-            record = read_game_record(self._db, uuid=uuid)
-            if not record or record['install_dir'] == NOT_INSTALLED:
-                raise RuntimeError(f'{game["game_name"]} is not recorded as installed.')
-            heirloom.uninstall_game(game['game_name'], record['install_dir'])
-            delete_game_record(self._db, uuid=uuid)
+            db = init_games_db(str(CONFIG_DIR), heirloom.games)
+            try:
+                record = read_game_record(db, uuid=uuid)
+                if not record or record['install_dir'] == NOT_INSTALLED:
+                    raise RuntimeError(f'{game["game_name"]} is not recorded as installed.')
+                heirloom.uninstall_game(game['game_name'], record['install_dir'])
+                delete_game_record(db, uuid=uuid)
+            finally:
+                db.close()
             self._operationStatus.emit(f'Uninstalled {game["game_name"]}.')
             self._refresh_library_worker()
         except Exception as exc:
             self._operationFailed.emit(str(exc))
 
-    def _merge_database_records(self, games):
+    def _merge_database_records(self, db, games):
         merged = []
         for game in games:
-            record = read_game_record(self._db, uuid=game['installer_uuid'])
+            record = read_game_record(db, uuid=game['installer_uuid'])
             if not record:
-                record = read_game_record(self._db, name=game['game_name'])
+                record = read_game_record(db, name=game['game_name'])
             item = dict(game)
             item['install_dir'] = record.get('install_dir', NOT_INSTALLED) if record else NOT_INSTALLED
             item['executable'] = record.get('executable', NOT_INSTALLED) if record else NOT_INSTALLED
