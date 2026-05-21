@@ -4,4 +4,4 @@ rich
 InquirerPy
 cryptography
 keyring
-PySide6
+PySide6>=6.6,<6.8

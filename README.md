@@ -229,6 +229,12 @@ Launch the Qt interface with:
 heirloom-gui
 ```
 
+If Qt crashes before the window opens, collect environment details without importing Qt:
+
+```bash
+heirloom-gui --diagnose
+```
+
 The GUI can:
 
 - Prompt for initial Legacy Games configuration.

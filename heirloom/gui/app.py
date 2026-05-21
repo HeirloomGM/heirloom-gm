@@ -1,4 +1,5 @@
 import sys
+import os
 from importlib import resources
 
 from PySide6.QtCore import QCoreApplication, QUrl
@@ -9,6 +10,8 @@ from .backend import GuiController
 
 
 def main():
+    os.environ.setdefault('QSG_RHI_BACKEND', 'opengl')
+
     QCoreApplication.setApplicationName('Heirloom Games Manager')
     QCoreApplication.setOrganizationName('HeirloomGM')
 
