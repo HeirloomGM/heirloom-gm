@@ -62,6 +62,7 @@ ApplicationWindow {
             width: 86
             height: 86
             radius: 43
+            antialiasing: true
             color: "#111820"
             border.color: "#2b5f52"
             border.width: 1
@@ -73,6 +74,7 @@ ApplicationWindow {
                 width: 9
                 height: 9
                 radius: 4.5
+                antialiasing: true
                 color: index % 2 === 0 ? root.accent : root.amber
                 opacity: 0.28 + index * 0.065
                 x: loader.width / 2 + Math.cos((index / 10) * Math.PI * 2) * 43 - width / 2
@@ -88,6 +90,7 @@ ApplicationWindow {
             source: spinnerPath
             fillMode: Image.PreserveAspectFit
             smooth: true
+            mipmap: true
         }
 
         NumberAnimation on rotation {
@@ -182,6 +185,7 @@ ApplicationWindow {
                     source: logoPath
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                    mipmap: true
 
                     HoverHandler {
                         cursorShape: Qt.PointingHandCursor
@@ -441,6 +445,7 @@ ApplicationWindow {
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     smooth: true
+                                    mipmap: true
                                 }
 
                                 Rectangle {
@@ -656,6 +661,7 @@ ApplicationWindow {
                     source: logoPath
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                    mipmap: true
                 }
 
                 ColumnLayout {
