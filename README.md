@@ -266,8 +266,13 @@ The GUI can:
 - Install games.
 - Launch games with recorded executables.
 - Uninstall managed games.
+- Use native Wine or the Wine Flatpak runner.
+- Automatically add installed games to Steam as non-Steam shortcuts.
+- Automatically add installed games to the KDE Games menu.
 
 It is a Qt 6 QML app using PySide6. It is designed to feel at home on desktop Linux and Steam Deck rather than like a quick wrapper around terminal output.
+
+Steam shortcut support writes to Steam's per-user `shortcuts.vdf` files when they exist. Steam may need to be restarted before new non-Steam games appear. KDE menu support writes standard `.desktop` entries under `~/.local/share/applications` with the `Game` category.
 
 ## Library Usage
 
@@ -320,3 +325,13 @@ Why "Heirloom"?
 Because [legendary](https://github.com/derrod/legendary) handles Epic, [nile](https://github.com/imLinguin/nile) handles Amazon, and this handles Legacy.
 
 Legacy. Heirloom. You get it.
+
+---
+
+<p align="center">
+  <img src="heirloom_spinner.png" alt="Heirloom Chimp" width="180">
+</p>
+
+<p align="center">
+  <sub><em>Haters gonna hate, but Heirloom Chimp loves AI!</em></sub>
+</p>

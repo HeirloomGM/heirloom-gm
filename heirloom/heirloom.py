@@ -10,6 +10,7 @@ from rich.console import Console
 
 from .password_functions import *
 from .path_functions import *
+from .integrations import build_wine_command
 
 
 class Heirloom(object):
@@ -36,6 +37,9 @@ class Heirloom(object):
         self._base_install_dir = Path(base_install_dir).expanduser()
         self._base_install_wine_path = convert_to_wine_path(self._base_install_dir.as_posix())
         self._wine_path = kwargs.get('wine_path', shutil.which('wine'))
+        self._wine_runner = kwargs.get('wine_runner', 'native')
+        self._flatpak_path = kwargs.get('flatpak_path', shutil.which('flatpak') or 'flatpak')
+        self._wine_flatpak_app = kwargs.get('wine_flatpak_app', 'org.winehq.Wine')
         self._7zip_path = kwargs.get('7zip_path', shutil.which('7z'))
         self._default_installation_method = kwargs.get('default_installation_method', 'wine')
         self._quiet = kwargs.get('quiet', False)
@@ -116,6 +120,29 @@ class Heirloom(object):
     def _wine_install_path(self, folder_name):
         base = self._base_install_wine_path.rstrip('\\/')
         return f'{base}\\{folder_name}'
+
+
+    def _wine_config(self):
+        return {
+            'wine_runner': self._wine_runner,
+            'wine_path': self._wine_path,
+            'flatpak_path': self._flatpak_path,
+            'wine_flatpak_app': self._wine_flatpak_app,
+        }
+
+
+    def _wine_command(self, *args):
+        if self._wine_runner == 'flatpak':
+            if not self._flatpak_path or not (shutil.which(self._flatpak_path) or os.path.exists(self._flatpak_path)):
+                raise AssertionError('flatpak executable not found!')
+            return [self._flatpak_path, 'run', self._wine_flatpak_app, *args]
+        if not self._wine_path or not (shutil.which(self._wine_path) or os.path.exists(self._wine_path)):
+            raise AssertionError('wine executable not found!')
+        return [self._wine_path, *args]
+
+
+    def launch_command(self, executable):
+        return build_wine_command(self._wine_config(), executable)
 
 
     def login(self):
@@ -273,12 +300,10 @@ class Heirloom(object):
         wine_install_path = self._wine_install_path(folder_name)
         installer_path = self._tmp_dir / fn
         if installation_method.lower() == 'wine':
-            if not self._wine_path or not os.path.exists(self._wine_path):
-                raise AssertionError(f'wine executable not found!')
             if not show_gui:
-                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', str(installer_path), '/S', f'/D={wine_install_path}']
+                cmd = self._wine_command('start', '/b', '/wait', '/unix', str(installer_path), '/S', f'/D={wine_install_path}')
             else:
-                cmd = [self._wine_path, 'start', '/b', '/wait', '/unix', str(installer_path), f'/D={wine_install_path}']
+                cmd = self._wine_command('start', '/b', '/wait', '/unix', str(installer_path), f'/D={wine_install_path}')
         elif installation_method.lower() == '7zip':
             if not self._7zip_path or not os.path.exists(self._7zip_path):
                 raise AssertionError(f'7z executable not found!')

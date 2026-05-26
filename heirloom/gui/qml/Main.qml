@@ -157,6 +157,37 @@ ApplicationWindow {
         font.weight: Font.DemiBold
     }
 
+    component SettingsCheckBox: CheckBox {
+        id: control
+        spacing: 10
+        font.pixelSize: 13
+        contentItem: Text {
+            text: control.text
+            color: root.ink
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: control.indicator.width + control.spacing
+            font: control.font
+        }
+        indicator: Rectangle {
+            implicitWidth: 20
+            implicitHeight: 20
+            x: 0
+            y: parent.height / 2 - height / 2
+            radius: 5
+            color: control.checked ? root.accent : "#10151b"
+            border.color: control.checked ? root.accent : root.line
+
+            Text {
+                anchors.centerIn: parent
+                visible: control.checked
+                text: "✓"
+                color: "#06130f"
+                font.pixelSize: 14
+                font.weight: Font.Black
+            }
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         color: root.color
@@ -735,7 +766,7 @@ ApplicationWindow {
         Rectangle {
             anchors.centerIn: parent
             width: Math.min(parent.width - 48, 560)
-            height: 620
+            height: Math.min(parent.height - 48, 760)
             radius: 8
             color: root.panelRaised
             border.color: root.line
@@ -784,6 +815,14 @@ ApplicationWindow {
                     text: controller.configBaseInstallDir
                 }
 
+                FieldLabel { text: "Wine runner" }
+                ComboBox {
+                    id: wineRunnerInput
+                    Layout.fillWidth: true
+                    model: ["native", "flatpak"]
+                    Component.onCompleted: currentIndex = controller.configWineRunner === "flatpak" ? 1 : 0
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 12
@@ -797,6 +836,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             text: controller.configWinePath
                             placeholderText: "wine"
+                            enabled: wineRunnerInput.currentText === "native"
                         }
                     }
 
@@ -813,12 +853,54 @@ ApplicationWindow {
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+                    visible: wineRunnerInput.currentText === "flatpak"
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        FieldLabel { text: "Flatpak executable" }
+                        TextField {
+                            id: flatpakInput
+                            Layout.fillWidth: true
+                            text: controller.configFlatpakPath
+                            placeholderText: "flatpak"
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        FieldLabel { text: "Wine Flatpak app ID" }
+                        TextField {
+                            id: wineFlatpakInput
+                            Layout.fillWidth: true
+                            text: controller.configWineFlatpakApp
+                            placeholderText: "org.winehq.Wine"
+                        }
+                    }
+                }
+
                 FieldLabel { text: "Default install method" }
                 ComboBox {
                     id: installMethodInput
                     Layout.fillWidth: true
                     model: ["7zip", "wine"]
                     Component.onCompleted: currentIndex = controller.configDefaultInstallationMethod === "wine" ? 1 : 0
+                }
+
+                SettingsCheckBox {
+                    id: autoSteamInput
+                    text: "Automatically add installed games to Steam"
+                    checked: controller.configAutoAddSteam
+                }
+
+                SettingsCheckBox {
+                    id: autoKdeInput
+                    text: "Automatically add installed games to the KDE Games menu"
+                    checked: controller.configAutoAddKde
                 }
 
                 Item { Layout.fillHeight: true }
@@ -857,9 +939,14 @@ ApplicationWindow {
                                 userInput.text,
                                 passwordInput.text,
                                 installDirInput.text,
+                                wineRunnerInput.currentText,
                                 wineInput.text,
+                                flatpakInput.text,
+                                wineFlatpakInput.text,
                                 sevenZipInput.text,
-                                installMethodInput.currentText
+                                installMethodInput.currentText,
+                                autoSteamInput.checked,
+                                autoKdeInput.checked
                             )
                             if (userInput.text.length > 0 && (passwordInput.text.length > 0 || controller.configured))
                                 root.settingsOpen = false

@@ -13,6 +13,7 @@ from typing_extensions import Annotated
 from ..config import *
 from ..database_functions import *
 from ..heirloom import Heirloom
+from ..integrations import add_installed_game_integrations
 from ..password_functions import *
 
 
@@ -225,6 +226,7 @@ def install(game: Annotated[str, typer.Option(help='Game name to install, will b
     if executable != NOT_INSTALLED:
         console.print(f'To start game, run: [yellow]{config["wine_path"]} {executable}[/yellow]')
     write_game_record(config['db'], name=game, uuid=uuid, install_dir=result['install_path'], executable=executable)
+    add_installed_game_integrations(game, config, executable, install_dir=result.get('unix_install_path', ''))
 
 
 @app.command('info')
@@ -292,7 +294,7 @@ def launch(game: Annotated[str, typer.Option(help='Game name to launch, will be 
         console.print(f'[yellow]{game}[/yellow] does not have a recorded executable.')
         raise typer.Exit(1)
 
-    cmd = [config['wine_path'], record['executable']]
+    cmd = heirloom.launch_command(record['executable'])
     with console.status(f'Launching [yellow]{game}[/yellow]...'):
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     console.print(f'Launched [bold blue]{game}[/bold blue].')

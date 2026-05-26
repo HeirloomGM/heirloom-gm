@@ -28,6 +28,7 @@ from ..database_functions import (
     write_game_record,
 )
 from ..heirloom import Heirloom
+from ..integrations import add_installed_game_integrations
 from ..password_functions import decrypt_password, encrypt_password, get_encryption_key, set_encryption_key
 
 
@@ -159,9 +160,14 @@ class GuiController(QObject):
         self._config = {}
         self._config_user = ''
         self._config_base_install_dir = str(Path('~/Games/LegacyGames/').expanduser())
+        self._config_wine_runner = 'native'
         self._config_wine_path = shutil.which('wine') or ''
+        self._config_flatpak_path = shutil.which('flatpak') or 'flatpak'
+        self._config_wine_flatpak_app = 'org.winehq.Wine'
         self._config_sevenzip_path = shutil.which('7z') or ''
         self._config_default_installation_method = '7zip'
+        self._config_auto_add_steam = False
+        self._config_auto_add_kde = False
         self._progress = -1.0
         self._progress_label = ''
         self._heirloom = None
@@ -228,6 +234,21 @@ class GuiController(QObject):
 
     configWinePath = Property(str, _get_config_wine_path, notify=settingsChanged)
 
+    def _get_config_wine_runner(self):
+        return self._config_wine_runner
+
+    configWineRunner = Property(str, _get_config_wine_runner, notify=settingsChanged)
+
+    def _get_config_flatpak_path(self):
+        return self._config_flatpak_path
+
+    configFlatpakPath = Property(str, _get_config_flatpak_path, notify=settingsChanged)
+
+    def _get_config_wine_flatpak_app(self):
+        return self._config_wine_flatpak_app
+
+    configWineFlatpakApp = Property(str, _get_config_wine_flatpak_app, notify=settingsChanged)
+
     def _get_config_sevenzip_path(self):
         return self._config_sevenzip_path
 
@@ -237,6 +258,16 @@ class GuiController(QObject):
         return self._config_default_installation_method
 
     configDefaultInstallationMethod = Property(str, _get_config_default_installation_method, notify=settingsChanged)
+
+    def _get_config_auto_add_steam(self):
+        return self._config_auto_add_steam
+
+    configAutoAddSteam = Property(bool, _get_config_auto_add_steam, notify=settingsChanged)
+
+    def _get_config_auto_add_kde(self):
+        return self._config_auto_add_kde
+
+    configAutoAddKde = Property(bool, _get_config_auto_add_kde, notify=settingsChanged)
 
     def _get_progress(self):
         return self._progress
@@ -271,8 +302,8 @@ class GuiController(QObject):
     def setFilterMode(self, mode):
         self.filtered_games.setMode(mode)
 
-    @Slot(str, str, str, str, str, str)
-    def saveConfiguration(self, user, password, base_install_dir, wine_path, sevenzip_path, install_method):
+    @Slot(str, str, str, str, str, str, str, str, str, bool, bool)
+    def saveConfiguration(self, user, password, base_install_dir, wine_runner, wine_path, flatpak_path, wine_flatpak_app, sevenzip_path, install_method, auto_add_steam, auto_add_kde):
         if not user.strip():
             self._set_error('Username is required.')
             return
@@ -292,9 +323,14 @@ class GuiController(QObject):
         else:
             parser.set('HeirloomGM', 'password', existing_password)
         parser.set('HeirloomGM', 'base_install_dir', base_install_dir.strip() or str(Path('~/Games/LegacyGames/').expanduser()))
+        parser.set('HeirloomGM', 'wine_runner', wine_runner or 'native')
         parser.set('HeirloomGM', 'wine_path', wine_path.strip() or shutil.which('wine') or '')
+        parser.set('HeirloomGM', 'flatpak_path', flatpak_path.strip() or shutil.which('flatpak') or 'flatpak')
+        parser.set('HeirloomGM', 'wine_flatpak_app', wine_flatpak_app.strip() or 'org.winehq.Wine')
         parser.set('HeirloomGM', '7zip_path', sevenzip_path.strip() or shutil.which('7z') or '')
         parser.set('HeirloomGM', 'default_installation_method', install_method or '7zip')
+        parser.set('HeirloomGM', 'auto_add_steam', str(auto_add_steam))
+        parser.set('HeirloomGM', 'auto_add_kde', str(auto_add_kde))
         with CONFIG_FILE.open('w') as config_file:
             parser.write(config_file)
         CONFIG_FILE.chmod(0o600)
@@ -357,11 +393,8 @@ class GuiController(QObject):
         if not record or record['executable'] == NOT_INSTALLED:
             self._set_error(f'{game["game_name"]} does not have a launch executable recorded.')
             return
-        subprocess.Popen(
-            [self._config['wine_path'], record['executable']],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        heirloom = self._heirloom or Heirloom(**self._config, quiet=True)
+        subprocess.Popen(heirloom.launch_command(record['executable']), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self._set_status(f'Launched {game["game_name"]}.')
 
     def _run(self, target):
@@ -389,9 +422,14 @@ class GuiController(QObject):
         section = parser['HeirloomGM']
         self._config_user = section.get('user', self._config_user)
         self._config_base_install_dir = section.get('base_install_dir', self._config_base_install_dir)
+        self._config_wine_runner = section.get('wine_runner', self._config_wine_runner)
         self._config_wine_path = section.get('wine_path', self._config_wine_path)
+        self._config_flatpak_path = section.get('flatpak_path', self._config_flatpak_path)
+        self._config_wine_flatpak_app = section.get('wine_flatpak_app', self._config_wine_flatpak_app)
         self._config_sevenzip_path = section.get('7zip_path', self._config_sevenzip_path)
         self._config_default_installation_method = section.get('default_installation_method', self._config_default_installation_method)
+        self._config_auto_add_steam = section.getboolean('auto_add_steam', fallback=self._config_auto_add_steam)
+        self._config_auto_add_kde = section.getboolean('auto_add_kde', fallback=self._config_auto_add_kde)
         self.settingsChanged.emit()
 
     def _load_config(self):
@@ -431,6 +469,7 @@ class GuiController(QObject):
             if result.get('status') != 'success':
                 raise RuntimeError(result.get('stderr') or 'Installation failed.')
             executable = self._select_executable(result.get('executable_files') or [], result['install_path'])
+            ui_game = self.games.game_by_uuid(uuid) or {}
             db = init_games_db(str(CONFIG_DIR), heirloom.games)
             try:
                 write_game_record(
@@ -443,6 +482,21 @@ class GuiController(QObject):
             finally:
                 db.close()
             self._operationStatus.emit(f'Installed {result["game"]}.')
+            integrations = add_installed_game_integrations(
+                result['game'],
+                self._config,
+                executable,
+                install_dir=result.get('unix_install_path', ''),
+                icon_path=ui_game.get('coverart_local', ''),
+            )
+            if integrations:
+                labels = []
+                if integrations.get('steam'):
+                    labels.append('Steam')
+                if integrations.get('kde'):
+                    labels.append('KDE')
+                if labels:
+                    self._operationStatus.emit(f'Installed {result["game"]} and added it to {", ".join(labels)}.')
             self._refresh_library_worker()
         except Exception as exc:
             self._operationFailed.emit(str(exc))
