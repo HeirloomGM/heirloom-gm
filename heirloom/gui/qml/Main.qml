@@ -175,8 +175,8 @@ ApplicationWindow {
                 spacing: 18
 
                 Image {
-                    Layout.preferredWidth: 165
-                    Layout.preferredHeight: 165
+                    Layout.preferredWidth: 228
+                    Layout.preferredHeight: 228
                     Layout.alignment: Qt.AlignHCenter
                     source: logoPath
                     fillMode: Image.PreserveAspectFit
