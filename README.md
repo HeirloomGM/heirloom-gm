@@ -329,7 +329,7 @@ Legacy. Heirloom. You get it.
 ---
 
 <p align="center">
-  <img src="heirloom_spinner.png" alt="Heirloom Chimp" width="180">
+  <img src="heirloom/gui/assets/heirloom_spinner.png" alt="Heirloom Chimp" width="180">
 </p>
 
 <p align="center">
