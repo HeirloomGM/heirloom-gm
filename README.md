@@ -92,6 +92,14 @@ On Steam Deck, those pieces may depend on how you have set up your environment. 
 
 ## Installation
 
+For a local checkout, the easiest route is:
+
+```bash
+./install.sh
+```
+
+That script creates `.venv` in the repository, installs the requirements, installs Heirloom itself from `pyproject.toml`, and creates a KDE application-menu entry called `Heirloom GUI` under Games. The menu item runs `run-heirloom-gui.sh`, which activates the virtual environment and launches the GUI.
+
 I usually work in a virtual environment:
 
 ```bash

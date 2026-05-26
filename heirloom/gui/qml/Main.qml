@@ -84,7 +84,7 @@ ApplicationWindow {
             anchors.centerIn: parent
             width: 54
             height: 54
-            source: logoPath
+            source: spinnerPath
             fillMode: Image.PreserveAspectFit
             smooth: true
         }

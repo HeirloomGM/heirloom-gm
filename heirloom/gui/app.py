@@ -24,6 +24,7 @@ def main():
     controller = GuiController()
 
     logo_path = resources.files('heirloom.gui') / 'assets' / 'heirloom.png'
+    spinner_path = resources.files('heirloom.gui') / 'assets' / 'heirloom_spinner.png'
     if logo_path.is_file():
         app.setWindowIcon(QIcon(str(logo_path)))
 
@@ -31,6 +32,7 @@ def main():
     engine.rootContext().setContextProperty('controller', controller)
     engine.rootContext().setContextProperty('gamesModel', controller.filtered_games)
     engine.rootContext().setContextProperty('logoPath', QUrl.fromLocalFile(str(logo_path)).toString())
+    engine.rootContext().setContextProperty('spinnerPath', QUrl.fromLocalFile(str(spinner_path)).toString())
 
     qml_path = resources.files('heirloom.gui') / 'qml' / 'Main.qml'
     engine.load(QUrl.fromLocalFile(str(qml_path)))
