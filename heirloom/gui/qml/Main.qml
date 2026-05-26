@@ -6,13 +6,14 @@ ApplicationWindow {
     id: root
     width: 1280
     height: 800
-    minimumWidth: 980
+    minimumWidth: 1040
     minimumHeight: 680
     visible: true
     title: "Heirloom Games Manager"
     color: "#111418"
 
     property bool settingsOpen: !controller.configured
+    property bool aboutOpen: false
     property color ink: "#f5f7fb"
     property color muted: "#a6b0bf"
     property color panel: "#171b21"
@@ -163,7 +164,7 @@ ApplicationWindow {
         spacing: 0
 
         Rectangle {
-            Layout.preferredWidth: 286
+            Layout.preferredWidth: 340
             Layout.fillHeight: true
             color: "#0e1115"
             border.color: "#222933"
@@ -175,12 +176,21 @@ ApplicationWindow {
                 spacing: 18
 
                 Image {
-                    Layout.preferredWidth: 228
-                    Layout.preferredHeight: 228
+                    Layout.preferredWidth: 292
+                    Layout.preferredHeight: 292
                     Layout.alignment: Qt.AlignHCenter
                     source: logoPath
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+
+                    HoverHandler {
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.aboutOpen = true
+                    }
                 }
 
                 ColumnLayout {
@@ -606,6 +616,98 @@ ApplicationWindow {
                         elide: Text.ElideRight
                         font.pixelSize: 12
                     }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: root.aboutOpen
+        color: "#cc090c10"
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.aboutOpen = false
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 72, 760)
+            height: Math.min(parent.height - 72, 700)
+            radius: 8
+            color: root.panelRaised
+            border.color: root.line
+            border.width: 1
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: mouse.accepted = true
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 30
+                spacing: 18
+
+                Image {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(430, parent.height * 0.62)
+                    source: logoPath
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Heirloom Games Manager"
+                        color: root.ink
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 28
+                        font.weight: Font.Black
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "A Linux and Steam Deck friendly manager for Legacy Games."
+                        color: root.muted
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 14
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    color: root.line
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "Heirloom can browse your Legacy Games library, install games with Wine or 7-Zip, track installed titles, launch games, and cleanly uninstall managed installs."
+                    color: root.muted
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.15
+                    font.pixelSize: 13
+                }
+
+                Item { Layout.fillHeight: true }
+
+                HButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 160
+                    text: "Close"
+                    fill: "#15221f"
+                    fillHover: "#19342d"
+                    stroke: "#2a6153"
+                    labelColor: root.accent
+                    onClicked: root.aboutOpen = false
                 }
             }
         }
